@@ -1,0 +1,147 @@
+// PaddleHub database schema
+// Run `npm run db:migrate` after edits.
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider  = "postgresql"
+  url = env("DATABASE_URL")
+}
+
+enum MatchFormat {
+  SINGLES
+  DOUBLES
+}
+
+enum MatchStatus {
+  OPEN
+  CONFIRMED
+  COMPLETED
+  CANCELLED
+}
+
+enum SkillLevel {
+  BEGINNER
+  INTERMEDIATE
+  ADVANCED
+  PRO
+}
+
+enum Role {
+  PLAYER
+  ADMIN
+}
+
+enum CourtStatus {
+  AVAILABLE
+  MAINTENANCE
+  CLOSED
+}
+
+model User {
+  id            String   @id @default(cuid())
+  clerkId       String   @unique
+  email         String   @unique
+  name          String
+  avatarUrl     String?
+  bio           String?
+  role          Role     @default(PLAYER)
+  skillRating   Float    @default(3.0)
+  skillLevel    SkillLevel @default(INTERMEDIATE)
+  preferredFormat MatchFormat @default(DOUBLES)
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  hostedMatches Match[]  @relation("MatchHost")
+  participants  MatchParticipant[]
+  ratingsGiven  Rating[] @relation("RatingFrom")
+  ratingsReceived Rating[] @relation("RatingTo")
+  notifications Notification[]
+  managedCourts Court[]  @relation("CourtManager")
+
+  @@index([skillRating])
+}
+
+model Court {
+  id        String      @id @default(cuid())
+  name      String      @unique
+  location  String
+  surface   String
+  status    CourtStatus @default(AVAILABLE)
+  managerId String
+  manager   User        @relation("CourtManager", fields: [managerId], references: [id])
+  createdAt DateTime    @default(now())
+  updatedAt DateTime    @updatedAt
+
+  matches   Match[]
+
+  @@index([status])
+}
+
+model Match {
+  id          String      @id @default(cuid())
+  hostId      String
+  host        User        @relation("MatchHost", fields: [hostId], references: [id])
+  courtId     String
+  court       Court       @relation(fields: [courtId], references: [id])
+  scheduledAt DateTime
+  format      MatchFormat
+  skillMin    Float       @default(2.0)
+  skillMax    Float       @default(5.0)
+  capacity    Int
+  notes       String?
+  status      MatchStatus @default(OPEN)
+  createdAt   DateTime    @default(now())
+  updatedAt   DateTime    @updatedAt
+
+  participants MatchParticipant[]
+  ratings      Rating[]
+
+  @@index([status, scheduledAt])
+  @@index([courtId, scheduledAt])
+}
+
+model MatchParticipant {
+  id        String   @id @default(cuid())
+  matchId   String
+  userId    String
+  joinedAt  DateTime @default(now())
+  waitlist  Boolean  @default(false)
+
+  match Match @relation(fields: [matchId], references: [id], onDelete: Cascade)
+  user  User  @relation(fields: [userId], references: [id])
+
+  @@unique([matchId, userId])
+}
+
+model Rating {
+  id        String   @id @default(cuid())
+  matchId   String
+  fromId    String
+  toId      String
+  sportsmanship Int  // 1-5
+  punctuality   Int  // 1-5
+  comment   String?
+  createdAt DateTime @default(now())
+
+  match Match @relation(fields: [matchId], references: [id], onDelete: Cascade)
+  from  User  @relation("RatingFrom", fields: [fromId], references: [id])
+  to    User  @relation("RatingTo", fields: [toId], references: [id])
+
+  @@unique([matchId, fromId, toId])
+}
+
+model Notification {
+  id        String   @id @default(cuid())
+  userId    String
+  type      String
+  payload   Json
+  readAt    DateTime?
+  createdAt DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id])
+
+  @@index([userId, readAt])
+}
