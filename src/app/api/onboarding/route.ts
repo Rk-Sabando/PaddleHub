@@ -52,7 +52,7 @@ export async function POST(req: Request) {
       return NextResponse.json(
         {
           error:
-            "Saved your profile, but could not sync to Clerk. Check CLERK_SECRET_KEY and server logs.",
+            "Saved your profile, but we couldn't finish account setup. Please try again later.",
         },
         { status: 500 },
       );
