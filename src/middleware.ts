@@ -11,8 +11,8 @@ const isPublicRoute = createRouteMatcher([
 // Routes a signed-in but not-yet-onboarded user is allowed to hit. Everything
 // else funnels them to /onboarding.
 const isOnboardingExempt = createRouteMatcher([
-  "/onboarding",
-  "/api/onboarding",
+  "/onboarding(.*)",
+  "/api/onboarding(.*)",
   "/api/webhooks/(.*)",
 ]);
 
