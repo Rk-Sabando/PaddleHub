@@ -8,9 +8,7 @@ const nextConfig: NextConfig = {
       { protocol: "https", hostname: "images.clerk.dev" },
     ],
   },
-  experimental: {
-    typedRoutes: true,
-  },
+  typedRoutes: true,
 };
 
 export default nextConfig;
