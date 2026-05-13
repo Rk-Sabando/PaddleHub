@@ -38,6 +38,21 @@ enum CourtStatus {
   AVAILABLE
   MAINTENANCE
   CLOSED
+  RENTED
+}
+
+enum EventStatus {
+  OPEN          // signups open
+  MATCHMAKING   // signups closed; admin is pairing players
+  IN_PROGRESS   // matches under way
+  COMPLETED
+  CANCELLED
+}
+
+enum SignupStatus {
+  PENDING       // request received; awaiting admin confirmation
+  CONFIRMED     // counts toward event capacity
+  DECLINED
 }
 
 model User {
@@ -61,8 +76,52 @@ model User {
   ratingsReceived Rating[] @relation("RatingTo")
   notifications Notification[]
   managedCourts Court[]  @relation("CourtManager")
+  hostedEvents  Event[]  @relation("EventHost")
+  eventSignups  EventSignup[]
 
   @@index([skillRating])
+}
+
+// An Event is a scheduled gathering players sign up for. Matchmaking later
+// turns signups into Matches (each Match referencing a Court). The Event itself
+// has no direct Court relation — courts are picked per-Match.
+model Event {
+  id          String      @id @default(cuid())
+  name        String
+  description String?
+  hostId      String
+  host        User        @relation("EventHost", fields: [hostId], references: [id])
+  scheduledAt DateTime
+  endsAt      DateTime?
+  format      MatchFormat @default(DOUBLES)
+  capacity    Int
+  skillMin    Float       @default(1.0)
+  skillMax    Float       @default(5.0)
+  status      EventStatus @default(OPEN)
+  createdAt   DateTime    @default(now())
+  updatedAt   DateTime    @updatedAt
+
+  signups EventSignup[]
+  matches Match[]
+
+  @@index([status, scheduledAt])
+}
+
+model EventSignup {
+  id          String       @id @default(cuid())
+  eventId     String
+  userId      String
+  status      SignupStatus @default(PENDING)
+  decidedAt   DateTime?
+  decidedById String?
+  createdAt   DateTime     @default(now())
+
+  event     Event @relation(fields: [eventId], references: [id], onDelete: Cascade)
+  user      User  @relation(fields: [userId], references: [id])
+
+  @@unique([eventId, userId])
+  @@index([userId])
+  @@index([eventId, status])
 }
 
 model Court {
@@ -87,6 +146,8 @@ model Match {
   host        User        @relation("MatchHost", fields: [hostId], references: [id])
   courtId     String
   court       Court       @relation(fields: [courtId], references: [id])
+  eventId     String?
+  event       Event?      @relation(fields: [eventId], references: [id])
   scheduledAt DateTime
   format      MatchFormat
   skillMin    Float       @default(2.0)
@@ -102,6 +163,7 @@ model Match {
 
   @@index([status, scheduledAt])
   @@index([courtId, scheduledAt])
+  @@index([eventId])
 }
 
 model MatchParticipant {

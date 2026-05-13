@@ -16,14 +16,14 @@ const isOnboardingExempt = createRouteMatcher([
   "/api/webhooks/(.*)",
 ]);
 
-const isAdminRoute = createRouteMatcher(["/admin(.*)"]);
-const isPlayerRoute = createRouteMatcher(["/player(.*)"]);
+// Legacy URLs from before the IA flattened to shared routes. Map them to the
+// new /dashboard so existing bookmarks / saved links don't 404.
+const isLegacyRoleRoute = createRouteMatcher(["/admin(.*)", "/player(.*)"]);
 
-// Role and onboarded flag are mirrored from the User table into Clerk's
-// publicMetadata so they're available in sessionClaims at the edge without a
-// DB round-trip.
-type Role = "ADMIN" | "PLAYER";
-type SessionMetadata = { role?: Role; onboarded?: boolean };
+// Onboarded flag is mirrored from the User table into Clerk's publicMetadata
+// so it's available in sessionClaims at the edge without a DB round-trip.
+// Role-based access is enforced at the page level via requireRole().
+type SessionMetadata = { onboarded?: boolean };
 
 function getMetadata(sessionClaims: Record<string, unknown> | null | undefined): SessionMetadata {
   return (sessionClaims?.metadata ?? sessionClaims?.publicMetadata ?? {}) as SessionMetadata;
@@ -32,21 +32,16 @@ function getMetadata(sessionClaims: Record<string, unknown> | null | undefined):
 export default clerkMiddleware(async (auth, req) => {
   if (isPublicRoute(req)) return;
 
-  const { userId, sessionClaims, redirectToSignIn } = await auth();
+  const { userId, redirectToSignIn, sessionClaims } = await auth();
   if (!userId) return redirectToSignIn({ returnBackUrl: req.url });
 
-  const metadata = getMetadata(sessionClaims as Record<string, unknown> | null);
+  if (isLegacyRoleRoute(req)) {
+    return NextResponse.redirect(new URL("/dashboard", req.url));
+  }
 
+  const metadata = getMetadata(sessionClaims as Record<string, unknown> | null);
   if (!metadata.onboarded && !isOnboardingExempt(req)) {
     return NextResponse.redirect(new URL("/onboarding", req.url));
-  }
-
-  if (isAdminRoute(req) && metadata.role !== "ADMIN") {
-    return NextResponse.redirect(new URL("/player", req.url));
-  }
-
-  if (isPlayerRoute(req) && metadata.role !== "PLAYER") {
-    return NextResponse.redirect(new URL("/admin", req.url));
   }
 });
 

@@ -1,13 +1,37 @@
+import type { Route } from "next";
 import Link from "next/link";
+import { Role } from "@prisma/client";
+import { requireAuth } from "@/lib/auth";
 
-export function Sidebar() {
+type NavItem = { href: string; label: string };
+
+const playerNav: NavItem[] = [
+  { href: "/dashboard", label: "Dashboard" },
+  { href: "/events", label: "Event" },
+  { href: "/settings", label: "Settings" },
+];
+
+const adminNav: NavItem[] = [
+  { href: "/dashboard", label: "Dashboard" },
+  { href: "/events", label: "Events" },
+];
+
+export async function Sidebar() {
+  const user = await requireAuth();
+  const items = user.role === Role.ADMIN ? adminNav : playerNav;
+
   return (
     <aside className="hidden w-56 border-r p-4 md:block">
       <nav className="flex flex-col gap-1">
-        <Link href="/dashboard" className="rounded-md px-3 py-2 hover:bg-accent">Dashboard</Link>
-        <Link href="/matches" className="rounded-md px-3 py-2 hover:bg-accent">Find a match</Link>
-        <Link href="/matches/new" className="rounded-md px-3 py-2 hover:bg-accent">Create</Link>
-        <Link href="/settings" className="rounded-md px-3 py-2 hover:bg-accent">Settings</Link>
+        {items.map((item) => (
+          <Link
+            key={item.href}
+            href={item.href as Route}
+            className="rounded-md px-3 py-2 hover:bg-accent"
+          >
+            {item.label}
+          </Link>
+        ))}
       </nav>
     </aside>
   );
