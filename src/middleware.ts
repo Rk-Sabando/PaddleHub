@@ -37,9 +37,6 @@ export default clerkMiddleware(async (auth, req) => {
 
   const metadata = getMetadata(sessionClaims as Record<string, unknown> | null);
 
-  console.log('sessionClaims', sessionClaims);
-  console.log('metadata', metadata);
-
   if (!metadata.onboarded && !isOnboardingExempt(req)) {
     return NextResponse.redirect(new URL("/onboarding", req.url));
   }
