@@ -3,12 +3,13 @@ import { auth } from "@clerk/nextjs/server";
 import { Role } from "@prisma/client";
 import { db } from "@/lib/db";
 import { requireAdmin } from "@/lib/auth";
+import { type Route } from "next";
 
 export const dynamic = "force-dynamic";
 
 export default async function AdminPage() {
   const { userId } = await auth();
-  if (!userId) redirect("/sign-in");
+  if (!userId) redirect("/sign-in" as Route);
 
   // Throws ForbiddenError if the signed-in user is not an admin; the nearest
   // error boundary renders that as a 403.
@@ -44,7 +45,7 @@ export default async function AdminPage() {
           {openMatches.map((m) => (
             <li key={m.id} className="flex justify-between p-3">
               <div>
-                <div className="font-medium">{m.host.name}'s match</div>
+                <div className="font-medium">{m.host.name}&apos;s match</div>
                 <div className="text-xs text-muted-foreground">
                   {m.scheduledAt.toISOString()} · {m.participants.length}/{m.capacity}
                 </div>

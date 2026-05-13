@@ -8,18 +8,25 @@ const isPublicRoute = createRouteMatcher([
   "/api/webhooks/(.*)",
 ]);
 
+// Routes a signed-in but not-yet-onboarded user is allowed to hit. Everything
+// else funnels them to /onboarding.
+const isOnboardingExempt = createRouteMatcher([
+  "/onboarding(.*)",
+  "/api/onboarding(.*)",
+  "/api/webhooks/(.*)",
+]);
+
 const isAdminRoute = createRouteMatcher(["/admin(.*)"]);
 const isPlayerRoute = createRouteMatcher(["/player(.*)"]);
 
-// Role is mirrored from the User table into Clerk's publicMetadata so it's
-// available in sessionClaims at the edge without a DB round-trip.
+// Role and onboarded flag are mirrored from the User table into Clerk's
+// publicMetadata so they're available in sessionClaims at the edge without a
+// DB round-trip.
 type Role = "ADMIN" | "PLAYER";
+type SessionMetadata = { role?: Role; onboarded?: boolean };
 
-function getRole(sessionClaims: Record<string, unknown> | null | undefined): Role | null {
-  const metadata = (sessionClaims?.metadata ?? sessionClaims?.publicMetadata) as
-    | { role?: Role }
-    | undefined;
-  return metadata?.role ?? null;
+function getMetadata(sessionClaims: Record<string, unknown> | null | undefined): SessionMetadata {
+  return (sessionClaims?.metadata ?? sessionClaims?.publicMetadata ?? {}) as SessionMetadata;
 }
 
 export default clerkMiddleware(async (auth, req) => {
@@ -28,13 +35,17 @@ export default clerkMiddleware(async (auth, req) => {
   const { userId, sessionClaims, redirectToSignIn } = await auth();
   if (!userId) return redirectToSignIn({ returnBackUrl: req.url });
 
-  const role = getRole(sessionClaims as Record<string, unknown> | null);
+  const metadata = getMetadata(sessionClaims as Record<string, unknown> | null);
 
-  if (isAdminRoute(req) && role !== "ADMIN") {
+  if (!metadata.onboarded && !isOnboardingExempt(req)) {
+    return NextResponse.redirect(new URL("/onboarding", req.url));
+  }
+
+  if (isAdminRoute(req) && metadata.role !== "ADMIN") {
     return NextResponse.redirect(new URL("/player", req.url));
   }
 
-  if (isPlayerRoute(req) && role !== "PLAYER") {
+  if (isPlayerRoute(req) && metadata.role !== "PLAYER") {
     return NextResponse.redirect(new URL("/admin", req.url));
   }
 });
