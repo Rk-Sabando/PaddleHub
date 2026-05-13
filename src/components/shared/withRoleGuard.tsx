@@ -2,7 +2,8 @@
 
 import { useUser } from "@clerk/nextjs";
 import { useRouter } from "next/navigation";
-import { ComponentType, useEffect } from "react";
+import type { ComponentType} from "react";
+import { useEffect } from "react";
 import type { Role } from "@prisma/client";
 
 type WithRoleGuardOptions = {

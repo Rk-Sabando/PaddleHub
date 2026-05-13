@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import { ClerkProvider } from "@clerk/nextjs";
 import { Providers } from "./providers";
-// @ts-ignore: CSS module import for global styles
+// @ts-expect-error: CSS module import for global styles
 import "./globals.css";
 
 export const metadata: Metadata = {
