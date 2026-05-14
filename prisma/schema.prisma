@@ -42,9 +42,8 @@ enum CourtStatus {
 }
 
 enum EventStatus {
-  OPEN          // signups open
-  MATCHMAKING   // signups closed; admin is pairing players
-  IN_PROGRESS   // matches under way
+  OPEN          // scheduled, signups open
+  IN_PROGRESS   // event is live; late signups still allowed
   COMPLETED
   CANCELLED
 }

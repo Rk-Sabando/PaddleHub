@@ -7,6 +7,7 @@ import type {
   User,
 } from "@prisma/client";
 import { EventStatus, SignupStatus } from "@prisma/client";
+import { EventRealtimeRefresher } from "@/components/events/EventRealtimeRefresher";
 import { SignupButton } from "../SignupButton";
 
 type DetailEvent = Event & {
@@ -48,10 +49,14 @@ export function PlayerEventDetail({
   );
 
   const signedUp = !!own && own.status !== SignupStatus.DECLINED;
-  const eventOpen = event.status === EventStatus.OPEN;
+  // Players can still join after the event has started — only COMPLETED /
+  // CANCELLED block new requests.
+  const acceptingSignups =
+    event.status === EventStatus.OPEN || event.status === EventStatus.IN_PROGRESS;
 
   return (
     <div className="space-y-6">
+      <EventRealtimeRefresher eventId={event.id} />
       <header>
         <h1 className="text-3xl font-bold">{event.name}</h1>
         <p className="text-sm text-muted-foreground">
@@ -73,11 +78,11 @@ export function PlayerEventDetail({
         <SignupButton
           eventId={event.id}
           signedUp={signedUp}
-          disabled={!signedUp && !eventOpen}
+          disabled={!signedUp && !acceptingSignups}
         />
-        {!signedUp && !eventOpen && (
+        {!signedUp && !acceptingSignups && (
           <span className="text-xs text-muted-foreground">
-            Signups are closed for this event.
+            This event has ended.
           </span>
         )}
       </div>

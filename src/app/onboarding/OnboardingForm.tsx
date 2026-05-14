@@ -1,10 +1,17 @@
 "use client";
 
-import { useForm } from "react-hook-form";
+import { Controller, useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { useCompleteOnboarding } from "@/hooks/useProfile";
 import { onboardingSchema, type OnboardingInput } from "@/lib/validators/user";
 
@@ -22,6 +29,7 @@ export function OnboardingForm({ defaults }: Props) {
   const {
     register,
     handleSubmit,
+    control,
     formState: { errors },
   } = useForm<OnboardingInput>({
     resolver: zodResolver(onboardingSchema),
@@ -89,16 +97,23 @@ export function OnboardingForm({ defaults }: Props) {
       <div className="grid grid-cols-2 gap-4">
         <div className="space-y-1.5">
           <Label htmlFor="skillLevel">Skill level</Label>
-          <select
-            id="skillLevel"
-            {...register("skillLevel")}
-            className="flex h-9 w-full rounded-md border border-input bg-transparent px-3 text-sm shadow-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
-          >
-            <option value="BEGINNER">Beginner</option>
-            <option value="INTERMEDIATE">Intermediate</option>
-            <option value="ADVANCED">Advanced</option>
-            <option value="PRO">Pro</option>
-          </select>
+          <Controller
+            control={control}
+            name="skillLevel"
+            render={({ field }) => (
+              <Select value={field.value} onValueChange={field.onChange}>
+                <SelectTrigger id="skillLevel">
+                  <SelectValue placeholder="Pick a level" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="BEGINNER">Beginner</SelectItem>
+                  <SelectItem value="INTERMEDIATE">Intermediate</SelectItem>
+                  <SelectItem value="ADVANCED">Advanced</SelectItem>
+                  <SelectItem value="PRO">Pro</SelectItem>
+                </SelectContent>
+              </Select>
+            )}
+          />
           {errors.skillLevel && (
             <p className="text-xs text-destructive">{errors.skillLevel.message}</p>
           )}
@@ -122,14 +137,21 @@ export function OnboardingForm({ defaults }: Props) {
 
       <div className="space-y-1.5">
         <Label htmlFor="preferredFormat">Preferred format</Label>
-        <select
-          id="preferredFormat"
-          {...register("preferredFormat")}
-          className="flex h-9 w-full rounded-md border border-input bg-transparent px-3 text-sm shadow-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
-        >
-          <option value="DOUBLES">Doubles</option>
-          <option value="SINGLES">Singles</option>
-        </select>
+        <Controller
+          control={control}
+          name="preferredFormat"
+          render={({ field }) => (
+            <Select value={field.value} onValueChange={field.onChange}>
+              <SelectTrigger id="preferredFormat">
+                <SelectValue placeholder="Pick a format" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="DOUBLES">Doubles</SelectItem>
+                <SelectItem value="SINGLES">Singles</SelectItem>
+              </SelectContent>
+            </Select>
+          )}
+        />
         {errors.preferredFormat && (
           <p className="text-xs text-destructive">{errors.preferredFormat.message}</p>
         )}

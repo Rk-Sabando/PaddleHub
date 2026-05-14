@@ -50,4 +50,17 @@
   body {
     @apply bg-background text-foreground;
   }
+
+  /* The base Input uses display:flex, which turns the native date/time sub-
+     controls and the picker indicator into flex items laid out from the start
+     — leaving the calendar icon floating wherever the value ends. Push the
+     indicator to the right edge of the flex container. */
+  input[type="date"]::-webkit-calendar-picker-indicator,
+  input[type="datetime-local"]::-webkit-calendar-picker-indicator,
+  input[type="time"]::-webkit-calendar-picker-indicator,
+  input[type="month"]::-webkit-calendar-picker-indicator,
+  input[type="week"]::-webkit-calendar-picker-indicator {
+    margin-inline-start: auto;
+    cursor: pointer;
+  }
 }

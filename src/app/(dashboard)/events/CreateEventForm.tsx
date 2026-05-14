@@ -1,16 +1,30 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { useForm } from "react-hook-form";
+import { Controller, useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { Button } from "@/components/ui/button";
+import { DateTimePicker } from "@/components/ui/datetime-picker";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { useToast } from "@/hooks/use-toast";
 import { useCreateEvent } from "@/hooks/useEvents";
 import { createEventSchema, type CreateEventInput } from "@/lib/validators/event";
 
-export function CreateEventForm() {
+type Props = {
+  // Called after a successful create, before router.refresh(). Use this to
+  // close a containing dialog, etc.
+  onSuccess?: () => void;
+};
+
+export function CreateEventForm({ onSuccess }: Props = {}) {
   const router = useRouter();
   const { toast } = useToast();
   const createEvent = useCreateEvent();
@@ -19,6 +33,7 @@ export function CreateEventForm() {
     register,
     handleSubmit,
     reset,
+    control,
     formState: { errors },
   } = useForm<CreateEventInput>({
     resolver: zodResolver(createEventSchema),
@@ -35,6 +50,7 @@ export function CreateEventForm() {
       onSuccess: () => {
         reset();
         toast({ title: "Event created" });
+        onSuccess?.();
         router.refresh();
       },
     });
@@ -59,7 +75,18 @@ export function CreateEventForm() {
 
       <div className="space-y-1.5">
         <Label htmlFor="scheduledAt">Starts at</Label>
-        <Input id="scheduledAt" type="datetime-local" {...register("scheduledAt")} />
+        <Controller
+          control={control}
+          name="scheduledAt"
+          render={({ field }) => (
+            <DateTimePicker
+              id="scheduledAt"
+              value={field.value ?? null}
+              onChange={(d) => field.onChange(d ?? undefined)}
+              minDate={new Date()}
+            />
+          )}
+        />
         {errors.scheduledAt && (
           <p className="text-xs text-destructive">{errors.scheduledAt.message}</p>
         )}
@@ -67,20 +94,38 @@ export function CreateEventForm() {
 
       <div className="space-y-1.5">
         <Label htmlFor="endsAt">Ends at (optional)</Label>
-        <Input id="endsAt" type="datetime-local" {...register("endsAt")} />
+        <Controller
+          control={control}
+          name="endsAt"
+          render={({ field }) => (
+            <DateTimePicker
+              id="endsAt"
+              value={field.value ?? null}
+              onChange={(d) => field.onChange(d ?? undefined)}
+              minDate={new Date()}
+            />
+          )}
+        />
         {errors.endsAt && <p className="text-xs text-destructive">{errors.endsAt.message}</p>}
       </div>
 
       <div className="space-y-1.5">
         <Label htmlFor="format">Format</Label>
-        <select
-          id="format"
-          {...register("format")}
-          className="flex h-9 w-full rounded-md border border-input bg-transparent px-3 text-sm shadow-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
-        >
-          <option value="DOUBLES">Doubles</option>
-          <option value="SINGLES">Singles</option>
-        </select>
+        <Controller
+          control={control}
+          name="format"
+          render={({ field }) => (
+            <Select value={field.value} onValueChange={field.onChange}>
+              <SelectTrigger id="format">
+                <SelectValue placeholder="Pick a format" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="DOUBLES">Doubles</SelectItem>
+                <SelectItem value="SINGLES">Singles</SelectItem>
+              </SelectContent>
+            </Select>
+          )}
+        />
       </div>
 
       <div className="space-y-1.5">

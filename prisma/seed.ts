@@ -104,7 +104,100 @@ async function main() {
     },
   });
 
-  console.log(`Seeded 1 admin, ${players.length} players, ${courts.length} courts, 2 matches.`);
+  const randomPlayers = await seedRandomPlayers(40);
+
+  console.log(
+    `Seeded 1 admin, ${players.length + randomPlayers.length} players (${randomPlayers.length} random), ${courts.length} courts, 2 matches.`,
+  );
+}
+
+const FIRST_NAMES = [
+  "Aaron", "Bea", "Cleo", "Devon", "Emi", "Felix", "Gina", "Hugo",
+  "Iris", "Jade", "Kai", "Lara", "Milo", "Nico", "Omar", "Priya",
+  "Quinn", "Rosa", "Sasha", "Theo", "Uma", "Vince", "Wren", "Xander",
+  "Yui", "Zane", "Ada", "Bram", "Cora", "Dante", "Esme", "Finn",
+  "Gabi", "Hana", "Ines", "Jonas", "Kira", "Leo", "Maya", "Nora",
+];
+
+const LAST_NAMES = [
+  "Adler", "Bao", "Cruz", "Dela Rosa", "Eberhardt", "Foster", "Garcia",
+  "Hong", "Ito", "Joshi", "Khan", "Lim", "Mendoza", "Nguyen", "Okafor",
+  "Park", "Quintero", "Reyes", "Santos", "Tanaka", "Uddin", "Voss",
+  "Wang", "Xu", "Yamada", "Zaldivar", "Ali", "Becker", "Cohen", "Davila",
+  "Eriksen", "Flores", "Gonzales", "Hartono", "Ivanov", "Jacobs",
+];
+
+const BIOS = [
+  null,
+  "Weekend warrior; love a good doubles rally.",
+  "Picked up the paddle last summer and now I can't put it down.",
+  "Ex-tennis player, slowly converting to pickleball.",
+  "Looking for friendly games. Skill above ego.",
+  "Strong third shot drop, working on the dink game.",
+  null,
+  "Coach by day, player by evening.",
+];
+
+const SKILL_LEVELS = ["BEGINNER", "INTERMEDIATE", "ADVANCED", "PRO"] as const;
+const FORMATS = ["DOUBLES", "SINGLES"] as const;
+
+function pick<T>(arr: readonly T[]): T {
+  return arr[Math.floor(Math.random() * arr.length)]!;
+}
+
+function pickWeighted<T>(weights: ReadonlyArray<[T, number]>): T {
+  const total = weights.reduce((s, [, w]) => s + w, 0);
+  let roll = Math.random() * total;
+  for (const [value, weight] of weights) {
+    if ((roll -= weight) <= 0) return value;
+  }
+  return weights[weights.length - 1]![0];
+}
+
+async function seedRandomPlayers(count: number) {
+  const ops = Array.from({ length: count }, (_, i) => {
+    const firstName = FIRST_NAMES[i % FIRST_NAMES.length]!;
+    const lastName = LAST_NAMES[(i * 7) % LAST_NAMES.length]!;
+    const name = `${firstName} ${lastName}`;
+    const email = `seed-${i + 1}@demo.paddlehub.app`;
+    const clerkId = `demo_seed_${i + 1}`;
+    // Deterministic-ish: clamp to one decimal, between 2.0 and 4.9.
+    const skillRating = Math.round((2 + Math.random() * 2.9) * 10) / 10;
+    const skillLevel = pickWeighted<(typeof SKILL_LEVELS)[number]>([
+      ["BEGINNER", 2],
+      ["INTERMEDIATE", 5],
+      ["ADVANCED", 2],
+      ["PRO", 1],
+    ]);
+    const preferredFormat = pickWeighted<(typeof FORMATS)[number]>([
+      ["DOUBLES", 7],
+      ["SINGLES", 3],
+    ]);
+    // Spread joins over the last ~90 days; mark onboarded so they don't get
+    // shunted into the onboarding flow if someone signs in as them.
+    const createdAt = new Date(
+      Date.now() - Math.floor(Math.random() * 90) * 24 * 60 * 60 * 1000,
+    );
+    const onboardedAt = new Date(createdAt.getTime() + 5 * 60 * 1000);
+
+    return prisma.user.upsert({
+      where: { email },
+      update: {},
+      create: {
+        clerkId,
+        email,
+        name,
+        role: Role.PLAYER,
+        skillLevel: skillLevel as SkillLevel,
+        skillRating,
+        preferredFormat: preferredFormat as MatchFormat,
+        bio: pick(BIOS),
+        onboardedAt,
+        createdAt,
+      },
+    });
+  });
+  return Promise.all(ops);
 }
 
 main()

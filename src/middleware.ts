@@ -6,6 +6,9 @@ const isPublicRoute = createRouteMatcher([
   "/sign-in(.*)",
   "/sign-up(.*)",
   "/api/webhooks/(.*)",
+  // Dev-only routes guarded by their own DEV_API_TOKEN bearer auth + a
+  // NODE_ENV check; Clerk session isn't relevant.
+  "/api/dev/(.*)",
 ]);
 
 // Routes a signed-in but not-yet-onboarded user is allowed to hit. Everything

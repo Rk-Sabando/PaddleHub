@@ -6,28 +6,21 @@ import { Button } from "@/components/ui/button";
 import { useUpdateEventStatus } from "@/hooks/useEvents";
 
 const transitions: Record<EventStatus, EventStatus[]> = {
-  [EventStatus.OPEN]: [EventStatus.MATCHMAKING, EventStatus.CANCELLED],
-  [EventStatus.MATCHMAKING]: [
-    EventStatus.OPEN,
-    EventStatus.IN_PROGRESS,
-    EventStatus.CANCELLED,
-  ],
+  [EventStatus.OPEN]: [EventStatus.IN_PROGRESS, EventStatus.CANCELLED],
   [EventStatus.IN_PROGRESS]: [EventStatus.COMPLETED, EventStatus.CANCELLED],
   [EventStatus.COMPLETED]: [],
   [EventStatus.CANCELLED]: [],
 };
 
 const labels: Record<EventStatus, string> = {
-  [EventStatus.OPEN]: "Open for signups",
-  [EventStatus.MATCHMAKING]: "Matchmaking",
+  [EventStatus.OPEN]: "Upcoming",
   [EventStatus.IN_PROGRESS]: "In progress",
   [EventStatus.COMPLETED]: "Completed",
   [EventStatus.CANCELLED]: "Cancelled",
 };
 
 const actionLabels: Record<EventStatus, string> = {
-  [EventStatus.OPEN]: "Reopen signups",
-  [EventStatus.MATCHMAKING]: "Close signups → Matchmaking",
+  [EventStatus.OPEN]: "Reopen",
   [EventStatus.IN_PROGRESS]: "Start event",
   [EventStatus.COMPLETED]: "Mark completed",
   [EventStatus.CANCELLED]: "Cancel event",

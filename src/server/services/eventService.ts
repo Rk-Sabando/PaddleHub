@@ -1,6 +1,22 @@
 import { EventStatus, Prisma, SignupStatus } from "@prisma/client";
 import { db } from "@/lib/db";
+import { channels, events as pusherEvents } from "@/lib/pusher";
+import { pusherServer } from "@/lib/pusher-server";
 import type { CreateEventInput } from "@/lib/validators/event";
+
+// Wraps pusher triggers so a delivery failure can't bubble back into the
+// route handler — the DB write has already succeeded.
+async function broadcast(
+  channel: string,
+  eventName: string,
+  payload: Record<string, unknown>,
+): Promise<void> {
+  try {
+    await pusherServer.trigger(channel, eventName, payload);
+  } catch (err) {
+    console.error(`[realtime] failed to trigger ${eventName} on ${channel}`, err);
+  }
+}
 
 const adminEventInclude = {
   host: true,
@@ -42,12 +58,14 @@ export class SignupNotFoundError extends Error {
 
 // Forward transitions only; admin can also CANCEL from anywhere except COMPLETED.
 const allowedTransitions: Record<EventStatus, EventStatus[]> = {
-  OPEN: [EventStatus.MATCHMAKING, EventStatus.CANCELLED],
-  MATCHMAKING: [EventStatus.OPEN, EventStatus.IN_PROGRESS, EventStatus.CANCELLED],
+  OPEN: [EventStatus.IN_PROGRESS, EventStatus.CANCELLED],
   IN_PROGRESS: [EventStatus.COMPLETED, EventStatus.CANCELLED],
   COMPLETED: [],
   CANCELLED: [],
 };
+
+// Signups are accepted whenever the event hasn't ended yet.
+const ACCEPTING_SIGNUPS: EventStatus[] = [EventStatus.OPEN, EventStatus.IN_PROGRESS];
 
 export const eventService = {
   async listForAdmin() {
@@ -60,7 +78,7 @@ export const eventService = {
 
   async listForPlayer(userId: string) {
     return db.event.findMany({
-      where: { status: { in: [EventStatus.OPEN, EventStatus.MATCHMAKING] } },
+      where: { status: { in: ACCEPTING_SIGNUPS } },
       include: playerBrowseInclude(userId),
       orderBy: { scheduledAt: "asc" },
       take: 100,
@@ -72,9 +90,7 @@ export const eventService = {
   async getCurrentForPlayer(userId: string) {
     return db.event.findFirst({
       where: {
-        status: {
-          in: [EventStatus.OPEN, EventStatus.MATCHMAKING, EventStatus.IN_PROGRESS],
-        },
+        status: { in: ACCEPTING_SIGNUPS },
         signups: {
           some: {
             userId,
@@ -129,7 +145,7 @@ export const eventService = {
   },
 
   async create(hostId: string, input: CreateEventInput) {
-    return db.event.create({
+    const event = await db.event.create({
       data: {
         hostId,
         name: input.name,
@@ -143,6 +159,11 @@ export const eventService = {
       },
       include: adminEventInclude,
     });
+    await broadcast(channels.eventsFeed, pusherEvents.eventCreated, {
+      id: event.id,
+      name: event.name,
+    });
+    return event;
   },
 
   async updateStatus(eventId: string, next: EventStatus) {
@@ -154,21 +175,29 @@ export const eventService = {
         `Cannot move event from ${event.status} to ${next}`,
       );
     }
-    return db.event.update({
+    const updated = await db.event.update({
       where: { id: eventId },
       data: { status: next },
       include: adminEventInclude,
     });
+    await Promise.all([
+      broadcast(channels.event(eventId), pusherEvents.eventUpdated, {
+        id: eventId,
+        status: next,
+      }),
+      broadcast(channels.eventsFeed, pusherEvents.eventUpdated, { id: eventId }),
+    ]);
+    return updated;
   },
 
   // Player requests to join — always lands as PENDING. No capacity check;
   // admin curates the roster.
   async requestSignup(userId: string, eventId: string) {
-    return db.$transaction(async (tx) => {
+    const signup = await db.$transaction(async (tx) => {
       const event = await tx.event.findUnique({ where: { id: eventId } });
       if (!event) throw new Error("Event not found");
-      if (event.status !== EventStatus.OPEN) {
-        throw new EventClosedError("Event is not open for signups");
+      if (!ACCEPTING_SIGNUPS.includes(event.status)) {
+        throw new EventClosedError("Event has ended");
       }
       const existing = await tx.eventSignup.findUnique({
         where: { eventId_userId: { eventId, userId } },
@@ -191,18 +220,41 @@ export const eventService = {
         data: { eventId, userId, status: SignupStatus.PENDING },
       });
     });
+    // Detail page (admin) needs the new request; list pages don't change
+    // — confirmed count is unaffected by PENDING.
+    await broadcast(channels.event(eventId), pusherEvents.signupRequested, {
+      eventId,
+      signupId: signup.id,
+      userId,
+    });
+    return signup;
   },
 
   // Player withdraws — removes their row outright.
   async withdraw(userId: string, eventId: string) {
-    await db.eventSignup.deleteMany({
-      where: { eventId, userId },
+    // Capture whether the row was CONFIRMED so we know whether confirmed count
+    // (and thus the list view) needs to update.
+    const existing = await db.eventSignup.findUnique({
+      where: { eventId_userId: { eventId, userId } },
     });
+    await db.eventSignup.deleteMany({ where: { eventId, userId } });
+    if (existing) {
+      await broadcast(channels.event(eventId), pusherEvents.signupDecided, {
+        eventId,
+        signupId: existing.id,
+        withdrew: true,
+      });
+      if (existing.status === SignupStatus.CONFIRMED) {
+        await broadcast(channels.eventsFeed, pusherEvents.eventUpdated, {
+          id: eventId,
+        });
+      }
+    }
     return { ok: true };
   },
 
   async confirmSignup(adminId: string, signupId: string) {
-    return db.$transaction(async (tx) => {
+    const result = await db.$transaction(async (tx) => {
       const signup = await tx.eventSignup.findUnique({
         where: { id: signupId },
         include: {
@@ -218,11 +270,11 @@ export const eventService = {
         },
       });
       if (!signup) throw new SignupNotFoundError("Signup not found");
-      if (signup.status === SignupStatus.CONFIRMED) return signup;
+      if (signup.status === SignupStatus.CONFIRMED) return { signup, eventId: signup.eventId };
       if (signup.event._count.signups >= signup.event.capacity) {
         throw new EventCapacityError("Event is at capacity");
       }
-      return tx.eventSignup.update({
+      const updated = await tx.eventSignup.update({
         where: { id: signupId },
         data: {
           status: SignupStatus.CONFIRMED,
@@ -230,13 +282,26 @@ export const eventService = {
           decidedById: adminId,
         },
       });
+      return { signup: updated, eventId: signup.eventId };
     });
+    await Promise.all([
+      broadcast(channels.event(result.eventId), pusherEvents.signupDecided, {
+        eventId: result.eventId,
+        signupId,
+        status: SignupStatus.CONFIRMED,
+      }),
+      // Confirmed count changed → list view needs to update.
+      broadcast(channels.eventsFeed, pusherEvents.eventUpdated, {
+        id: result.eventId,
+      }),
+    ]);
+    return result.signup;
   },
 
   async declineSignup(adminId: string, signupId: string) {
-    const signup = await db.eventSignup.findUnique({ where: { id: signupId } });
-    if (!signup) throw new SignupNotFoundError("Signup not found");
-    return db.eventSignup.update({
+    const existing = await db.eventSignup.findUnique({ where: { id: signupId } });
+    if (!existing) throw new SignupNotFoundError("Signup not found");
+    const updated = await db.eventSignup.update({
       where: { id: signupId },
       data: {
         status: SignupStatus.DECLINED,
@@ -244,5 +309,18 @@ export const eventService = {
         decidedById: adminId,
       },
     });
+    await broadcast(channels.event(existing.eventId), pusherEvents.signupDecided, {
+      eventId: existing.eventId,
+      signupId,
+      status: SignupStatus.DECLINED,
+    });
+    // If we just declined someone who was CONFIRMED (admin removes them), the
+    // confirmed count drops — list view needs updating.
+    if (existing.status === SignupStatus.CONFIRMED) {
+      await broadcast(channels.eventsFeed, pusherEvents.eventUpdated, {
+        id: existing.eventId,
+      });
+    }
+    return updated;
   },
 };

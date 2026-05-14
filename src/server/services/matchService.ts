@@ -1,5 +1,6 @@
 import { db } from "@/lib/db";
-import { pusherServer, channels, events } from "@/lib/pusher";
+import { channels, events } from "@/lib/pusher";
+import { pusherServer } from "@/lib/pusher-server";
 import type { CreateMatchInput, ListMatchesQuery } from "@/lib/validators/match";
 
 // Business logic for matches. Keep route handlers thin; test these in Vitest.
@@ -30,6 +31,7 @@ export const matchService = {
     const match = await db.match.create({
       data: {
         hostId: userId,
+        courtId: input.courtId,
         scheduledAt: input.scheduledAt,
         format: input.format,
         skillMin: input.skillMin,

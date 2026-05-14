@@ -5,6 +5,7 @@ export const matchStatusSchema = z.enum(["OPEN", "CONFIRMED", "COMPLETED", "CANC
 
 export const createMatchSchema = z
   .object({
+    courtId: z.string().min(1, "Court is required"),
     scheduledAt: z.coerce.date().min(new Date(), "Match must be in the future"),
     format: matchFormatSchema,
     skillMin: z.number().min(1).max(5),
