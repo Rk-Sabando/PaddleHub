@@ -1,48 +1,87 @@
 "use client";
-import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+
+import { useQuery, useQueryClient } from "@tanstack/react-query";
+import type {
+  Court,
+  Match,
+  MatchParticipant,
+  User,
+} from "@prisma/client";
+import { apiFetch } from "@/lib/apiClient";
+import { useApiMutation } from "./useApiMutation";
 import type { CreateMatchInput, ListMatchesQuery } from "@/lib/validators/match";
 
-async function fetchMatches(query: Partial<ListMatchesQuery>) {
-  const params = new URLSearchParams(query as Record<string, string>);
-  const res = await fetch(`/api/matches?${params}`);
-  if (!res.ok) throw new Error("Failed to load matches");
-  return res.json();
+export const matchesKey = (query: Partial<ListMatchesQuery> = {}) =>
+  ["matches", query] as const;
+
+export const matchKey = (id: string) => ["match", id] as const;
+
+type MatchWithRelations = Match & {
+  host: User;
+  participants: (MatchParticipant & { user: User })[];
+  court?: Court | null;
+};
+
+type ListResponse = { matches: MatchWithRelations[] };
+type SingleResponse = { match: MatchWithRelations };
+type JoinResponse = { participant: MatchParticipant; waitlist: boolean };
+
+function listMatches(query: Partial<ListMatchesQuery>) {
+  const params = new URLSearchParams(
+    Object.entries(query).reduce<Record<string, string>>((acc, [k, v]) => {
+      if (v !== undefined && v !== null) acc[k] = String(v);
+      return acc;
+    }, {}),
+  );
+  return apiFetch<ListResponse>(`/api/matches?${params}`);
 }
 
 export function useMatches(query: Partial<ListMatchesQuery> = {}) {
   return useQuery({
-    queryKey: ["matches", query],
-    queryFn: () => fetchMatches(query),
+    queryKey: matchesKey(query),
+    queryFn: () => listMatches(query),
+  });
+}
+
+export function useMatch(id: string | undefined) {
+  return useQuery({
+    queryKey: matchKey(id ?? "missing"),
+    queryFn: () => apiFetch<SingleResponse>(`/api/matches/${id}`),
+    enabled: !!id,
   });
 }
 
 export function useCreateMatch() {
   const qc = useQueryClient();
-  return useMutation({
-    mutationFn: async (input: CreateMatchInput) => {
-      const res = await fetch("/api/matches", {
-        method: "POST",
-        headers: { "content-type": "application/json" },
-        body: JSON.stringify(input),
-      });
-      if (!res.ok) throw new Error("Failed to create match");
-      return res.json();
+  return useApiMutation<SingleResponse, Error, CreateMatchInput>({
+    mutationFn: (input) =>
+      apiFetch<SingleResponse>("/api/matches", { method: "POST", body: input }),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["matches"] });
     },
-    onSuccess: () => qc.invalidateQueries({ queryKey: ["matches"] }),
   });
 }
 
 export function useJoinMatch() {
   const qc = useQueryClient();
-  return useMutation({
-    mutationFn: async (matchId: string) => {
-      const res = await fetch(`/api/matches/${matchId}/join`, { method: "POST" });
-      if (!res.ok) throw new Error("Failed to join");
-      return res.json();
-    },
-    onSuccess: (_d, matchId) => {
+  return useApiMutation<JoinResponse, Error, string>({
+    mutationFn: (matchId) =>
+      apiFetch<JoinResponse>(`/api/matches/${matchId}/join`, { method: "POST" }),
+    onSuccess: (_data, matchId) => {
       qc.invalidateQueries({ queryKey: ["matches"] });
-      qc.invalidateQueries({ queryKey: ["match", matchId] });
+      qc.invalidateQueries({ queryKey: matchKey(matchId) });
+    },
+  });
+}
+
+export function useLeaveMatch() {
+  const qc = useQueryClient();
+  return useApiMutation<{ ok: boolean }, Error, string>({
+    mutationFn: (matchId) =>
+      apiFetch<{ ok: boolean }>(`/api/matches/${matchId}/leave`, { method: "POST" }),
+    onSuccess: (_data, matchId) => {
+      qc.invalidateQueries({ queryKey: ["matches"] });
+      qc.invalidateQueries({ queryKey: matchKey(matchId) });
     },
   });
 }

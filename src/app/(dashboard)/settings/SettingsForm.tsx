@@ -1,13 +1,14 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { useState } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import type { MatchFormat, SkillLevel } from "@prisma/client";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { useToast } from "@/hooks/use-toast";
+import { useUpdateProfile } from "@/hooks/useProfile";
 import { onboardingSchema, type OnboardingInput } from "@/lib/validators/user";
 
 type Props = {
@@ -24,14 +25,14 @@ type Props = {
 
 export function SettingsForm({ defaults }: Props) {
   const router = useRouter();
-  const [status, setStatus] = useState<{ kind: "idle" | "ok" | "error"; message?: string }>({
-    kind: "idle",
-  });
+  const { toast } = useToast();
+  const update = useUpdateProfile();
 
   const {
     register,
     handleSubmit,
-    formState: { errors, isSubmitting, isDirty },
+    reset,
+    formState: { errors, isDirty },
   } = useForm<OnboardingInput>({
     resolver: zodResolver(onboardingSchema),
     defaultValues: {
@@ -43,21 +44,22 @@ export function SettingsForm({ defaults }: Props) {
     },
   });
 
-  const onSubmit = async (values: OnboardingInput) => {
-    setStatus({ kind: "idle" });
-    const res = await fetch("/api/profile", {
-      method: "PATCH",
-      headers: { "content-type": "application/json" },
-      body: JSON.stringify(values),
+  const onSubmit = (values: OnboardingInput) =>
+    update.mutate(values, {
+      onSuccess: (data) => {
+        // Reset dirty state to the saved values so isDirty re-arms only after
+        // the user edits something new.
+        reset({
+          name: data.user.name,
+          bio: data.user.bio ?? "",
+          skillLevel: data.user.skillLevel,
+          skillRating: data.user.skillRating,
+          preferredFormat: data.user.preferredFormat,
+        });
+        toast({ title: "Profile saved" });
+        router.refresh();
+      },
     });
-    if (!res.ok) {
-      const body = (await res.json().catch(() => null)) as { error?: string } | null;
-      setStatus({ kind: "error", message: body?.error ?? "Could not update profile." });
-      return;
-    }
-    setStatus({ kind: "ok", message: "Saved." });
-    router.refresh();
-  };
 
   return (
     <form onSubmit={handleSubmit(onSubmit)} className="space-y-5">
@@ -138,15 +140,8 @@ export function SettingsForm({ defaults }: Props) {
         </select>
       </div>
 
-      {status.kind === "error" && (
-        <p className="text-sm text-destructive">{status.message}</p>
-      )}
-      {status.kind === "ok" && (
-        <p className="text-sm text-green-600">{status.message}</p>
-      )}
-
-      <Button type="submit" disabled={isSubmitting || !isDirty}>
-        {isSubmitting ? "Saving…" : "Save changes"}
+      <Button type="submit" disabled={update.isPending || !isDirty}>
+        {update.isPending ? "Saving…" : "Save changes"}
       </Button>
     </form>
   );

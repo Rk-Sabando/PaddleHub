@@ -1,12 +1,11 @@
 "use client";
 
-import { useState } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { useAuth } from "@clerk/nextjs";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { useCompleteOnboarding } from "@/hooks/useProfile";
 import { onboardingSchema, type OnboardingInput } from "@/lib/validators/user";
 
 type Props = {
@@ -18,10 +17,13 @@ type Props = {
 };
 
 export function OnboardingForm({ defaults }: Props) {
-  const { getToken } = useAuth();
-  const [submitError, setSubmitError] = useState<string | null>(null);
+  const complete = useCompleteOnboarding();
 
-  const form = useForm<OnboardingInput>({
+  const {
+    register,
+    handleSubmit,
+    formState: { errors },
+  } = useForm<OnboardingInput>({
     resolver: zodResolver(onboardingSchema),
     defaultValues: {
       name: defaults.name,
@@ -32,37 +34,15 @@ export function OnboardingForm({ defaults }: Props) {
     },
   });
 
-  const {
-    register,
-    handleSubmit,
-    formState: { errors, isSubmitting },
-  } = form;
-
-  const onSubmit = async (values: OnboardingInput) => {
-    setSubmitError(null);
-    const res = await fetch("/api/onboarding", {
-      method: "POST",
-      headers: { "content-type": "application/json" },
-      body: JSON.stringify(values),
+  const onSubmit = (values: OnboardingInput) =>
+    complete.mutate(values, {
+      onSuccess: () => {
+        // Hard navigate so the new __session cookie (with `onboarded: true`)
+        // is sent on the next request — middleware would otherwise read the
+        // stale claim and bounce us back here.
+        window.location.assign("/dashboard");
+      },
     });
-    if (!res.ok) {
-      const body = (await res.json().catch(() => null)) as { error?: string } | null;
-      setSubmitError(body?.error ?? "Could not save your profile. Try again.");
-      return;
-    }
-    // The API just updated Clerk publicMetadata.onboarded=true server-side, but
-    // the session JWT in the cookie still has the old claims. Force a token
-    // refresh so the next request through middleware carries the new claim
-    // and isn't redirected back to /onboarding.
-    try {
-      await getToken({ skipCache: true });
-    } catch (err) {
-      console.error("Token refresh failed after onboarding update", err);
-      // Refresh failed — fall through to a hard navigation, which will pick
-      // up a new token on its own anyway.
-    }
-    window.location.assign("/dashboard");
-  };
 
   return (
     <form onSubmit={handleSubmit(onSubmit)} className="space-y-5">
@@ -155,10 +135,8 @@ export function OnboardingForm({ defaults }: Props) {
         )}
       </div>
 
-      {submitError && <p className="text-sm text-destructive">{submitError}</p>}
-
-      <Button type="submit" disabled={isSubmitting} className="w-full">
-        {isSubmitting ? "Saving…" : "Finish setup"}
+      <Button type="submit" disabled={complete.isPending} className="w-full">
+        {complete.isPending ? "Saving…" : "Finish setup"}
       </Button>
     </form>
   );

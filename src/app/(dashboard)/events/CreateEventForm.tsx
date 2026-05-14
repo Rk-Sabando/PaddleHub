@@ -1,23 +1,25 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { useState } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { useToast } from "@/hooks/use-toast";
+import { useCreateEvent } from "@/hooks/useEvents";
 import { createEventSchema, type CreateEventInput } from "@/lib/validators/event";
 
 export function CreateEventForm() {
   const router = useRouter();
-  const [submitError, setSubmitError] = useState<string | null>(null);
+  const { toast } = useToast();
+  const createEvent = useCreateEvent();
 
   const {
     register,
     handleSubmit,
     reset,
-    formState: { errors, isSubmitting },
+    formState: { errors },
   } = useForm<CreateEventInput>({
     resolver: zodResolver(createEventSchema),
     defaultValues: {
@@ -28,21 +30,14 @@ export function CreateEventForm() {
     },
   });
 
-  const onSubmit = async (values: CreateEventInput) => {
-    setSubmitError(null);
-    const res = await fetch("/api/events", {
-      method: "POST",
-      headers: { "content-type": "application/json" },
-      body: JSON.stringify(values),
+  const onSubmit = (values: CreateEventInput) =>
+    createEvent.mutate(values, {
+      onSuccess: () => {
+        reset();
+        toast({ title: "Event created" });
+        router.refresh();
+      },
     });
-    if (!res.ok) {
-      const body = (await res.json().catch(() => null)) as { error?: string } | null;
-      setSubmitError(body?.error ?? "Could not create event.");
-      return;
-    }
-    reset();
-    router.refresh();
-  };
 
   return (
     <form onSubmit={handleSubmit(onSubmit)} className="grid gap-4 md:grid-cols-2">
@@ -125,13 +120,9 @@ export function CreateEventForm() {
         {errors.skillMax && <p className="text-xs text-destructive">{errors.skillMax.message}</p>}
       </div>
 
-      {submitError && (
-        <p className="text-sm text-destructive md:col-span-2">{submitError}</p>
-      )}
-
       <div className="md:col-span-2">
-        <Button type="submit" disabled={isSubmitting}>
-          {isSubmitting ? "Creating…" : "Create event"}
+        <Button type="submit" disabled={createEvent.isPending}>
+          {createEvent.isPending ? "Creating…" : "Create event"}
         </Button>
       </div>
     </form>

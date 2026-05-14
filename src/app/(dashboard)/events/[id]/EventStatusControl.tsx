@@ -1,9 +1,9 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { useState } from "react";
 import { EventStatus } from "@prisma/client";
 import { Button } from "@/components/ui/button";
+import { useUpdateEventStatus } from "@/hooks/useEvents";
 
 const transitions: Record<EventStatus, EventStatus[]> = {
   [EventStatus.OPEN]: [EventStatus.MATCHMAKING, EventStatus.CANCELLED],
@@ -40,27 +40,10 @@ type Props = {
 
 export function EventStatusControl({ eventId, status }: Props) {
   const router = useRouter();
-  const [pending, setPending] = useState<EventStatus | null>(null);
-  const [error, setError] = useState<string | null>(null);
+  const update = useUpdateEventStatus(eventId);
+  const inFlight = update.isPending ? update.variables : undefined;
 
   const next = transitions[status];
-
-  const move = async (target: EventStatus) => {
-    setPending(target);
-    setError(null);
-    const res = await fetch(`/api/events/${eventId}`, {
-      method: "PATCH",
-      headers: { "content-type": "application/json" },
-      body: JSON.stringify({ status: target }),
-    });
-    setPending(null);
-    if (!res.ok) {
-      const body = (await res.json().catch(() => null)) as { error?: string } | null;
-      setError(body?.error ?? "Could not update event status.");
-      return;
-    }
-    router.refresh();
-  };
 
   return (
     <div className="space-y-2 rounded-md border bg-card p-3 text-sm">
@@ -75,15 +58,16 @@ export function EventStatusControl({ eventId, status }: Props) {
               key={target}
               size="sm"
               variant={target === EventStatus.CANCELLED ? "outline" : "default"}
-              disabled={pending !== null}
-              onClick={() => move(target)}
+              disabled={update.isPending}
+              onClick={() =>
+                update.mutate(target, { onSuccess: () => router.refresh() })
+              }
             >
-              {pending === target ? "Updating…" : actionLabels[target]}
+              {inFlight === target ? "Updating…" : actionLabels[target]}
             </Button>
           ))}
         </div>
       )}
-      {error && <p className="text-xs text-destructive">{error}</p>}
     </div>
   );
 }

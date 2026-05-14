@@ -1,9 +1,9 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { useState } from "react";
 import { SignupStatus } from "@prisma/client";
 import { Button } from "@/components/ui/button";
+import { useDecideSignup } from "@/hooks/useEventSignups";
 
 type Props = {
   eventId: string;
@@ -19,61 +19,47 @@ export function SignupDecisionButtons({
   variant = "pending",
 }: Props) {
   const router = useRouter();
-  const [pending, setPending] = useState<SignupStatus | null>(null);
-  const [error, setError] = useState<string | null>(null);
+  const decide = useDecideSignup(eventId);
 
-  const decide = async (status: SignupStatus) => {
-    setPending(status);
-    setError(null);
-    const res = await fetch(`/api/events/${eventId}/signups/${signupId}`, {
-      method: "PATCH",
-      headers: { "content-type": "application/json" },
-      body: JSON.stringify({ status }),
-    });
-    setPending(null);
-    if (!res.ok) {
-      const body = (await res.json().catch(() => null)) as { error?: string } | null;
-      setError(body?.error ?? "Could not update signup.");
-      return;
-    }
-    router.refresh();
-  };
+  // `decide.variables?.status` tells us which button started the in-flight
+  // request, so the spinner sits on the right control.
+  const inFlight = decide.isPending ? decide.variables?.status : undefined;
+
+  const run = (status: SignupStatus) =>
+    decide.mutate({ signupId, status }, { onSuccess: () => router.refresh() });
 
   return (
-    <div className="flex flex-col items-end gap-1">
-      <div className="flex gap-2">
-        {variant === "pending" && (
-          <>
-            <Button
-              size="sm"
-              disabled={pending !== null || capacityReached}
-              onClick={() => decide(SignupStatus.CONFIRMED)}
-              title={capacityReached ? "Event is at capacity" : undefined}
-            >
-              {pending === SignupStatus.CONFIRMED ? "Confirming…" : "Confirm"}
-            </Button>
-            <Button
-              size="sm"
-              variant="outline"
-              disabled={pending !== null}
-              onClick={() => decide(SignupStatus.DECLINED)}
-            >
-              {pending === SignupStatus.DECLINED ? "Declining…" : "Decline"}
-            </Button>
-          </>
-        )}
-        {variant === "confirmed" && (
+    <div className="flex gap-2">
+      {variant === "pending" && (
+        <>
+          <Button
+            size="sm"
+            disabled={decide.isPending || capacityReached}
+            onClick={() => run(SignupStatus.CONFIRMED)}
+            title={capacityReached ? "Event is at capacity" : undefined}
+          >
+            {inFlight === SignupStatus.CONFIRMED ? "Confirming…" : "Confirm"}
+          </Button>
           <Button
             size="sm"
             variant="outline"
-            disabled={pending !== null}
-            onClick={() => decide(SignupStatus.DECLINED)}
+            disabled={decide.isPending}
+            onClick={() => run(SignupStatus.DECLINED)}
           >
-            {pending === SignupStatus.DECLINED ? "Removing…" : "Remove"}
+            {inFlight === SignupStatus.DECLINED ? "Declining…" : "Decline"}
           </Button>
-        )}
-      </div>
-      {error && <p className="text-xs text-destructive">{error}</p>}
+        </>
+      )}
+      {variant === "confirmed" && (
+        <Button
+          size="sm"
+          variant="outline"
+          disabled={decide.isPending}
+          onClick={() => run(SignupStatus.DECLINED)}
+        >
+          {inFlight === SignupStatus.DECLINED ? "Removing…" : "Remove"}
+        </Button>
+      )}
     </div>
   );
 }
