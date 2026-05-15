@@ -85,3 +85,26 @@ export function useLeaveMatch() {
     },
   });
 }
+
+type EndAndAdvanceResponse = {
+  ok: boolean;
+  endedMatchId: string;
+  nextMatchId: string | null;
+  nextParticipants: { userId: string; name: string }[];
+};
+
+// Ends the active match on a court and auto-assigns the next group from the
+// parent event's confirmed signup pool. Used by the courts board.
+export function useEndAndAdvanceMatch() {
+  const qc = useQueryClient();
+  return useApiMutation<EndAndAdvanceResponse, Error, string>({
+    mutationFn: (matchId) =>
+      apiFetch<EndAndAdvanceResponse>(`/api/matches/${matchId}/end`, {
+        method: "POST",
+      }),
+    onSuccess: (_data, matchId) => {
+      qc.invalidateQueries({ queryKey: ["matches"] });
+      qc.invalidateQueries({ queryKey: matchKey(matchId) });
+    },
+  });
+}

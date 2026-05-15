@@ -143,11 +143,12 @@ model Match {
   id          String      @id @default(cuid())
   hostId      String
   host        User        @relation("MatchHost", fields: [hostId], references: [id])
-  courtId     String
-  court       Court       @relation(fields: [courtId], references: [id])
+  courtId     String?
+  court       Court?      @relation(fields: [courtId], references: [id])
   eventId     String?
   event       Event?      @relation(fields: [eventId], references: [id])
   scheduledAt DateTime
+  startedAt   DateTime?
   format      MatchFormat
   skillMin    Float       @default(2.0)
   skillMax    Float       @default(5.0)

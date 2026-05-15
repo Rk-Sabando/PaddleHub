@@ -14,6 +14,7 @@ const playerNav: NavItem[] = [
 const adminNav: NavItem[] = [
   { href: "/dashboard", label: "Dashboard" },
   { href: "/events", label: "Events" },
+  { href: "/courts", label: "Courts" },
 ];
 
 export async function Sidebar() {

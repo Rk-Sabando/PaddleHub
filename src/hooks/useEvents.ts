@@ -39,3 +39,44 @@ export function useUpdateEventStatus(eventId: string) {
     },
   });
 }
+
+type MatchmakeResponse = {
+  ok: boolean;
+  created: number;
+  leftover: { userId: string; name: string }[];
+  perMatch: number;
+  courtsUsed: number;
+};
+
+export function useStartMatchmaking(eventId: string) {
+  const qc = useQueryClient();
+  return useApiMutation<MatchmakeResponse, Error, void>({
+    mutationFn: () =>
+      apiFetch<MatchmakeResponse>(`/api/events/${eventId}/matchmake`, {
+        method: "POST",
+      }),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: eventKey(eventId) });
+    },
+  });
+}
+
+type AssignResponse =
+  | { ok: true; assigned: true; matchId: string; participants: { userId: string; name: string }[] }
+  | { ok: true; assigned: false; message: string };
+
+// Puts a match onto a court that's currently idle. Used by the "Assign next
+// match" button on EventCourtCard when an admin re-opens a court.
+export function useAssignMatchToCourt(eventId: string) {
+  const qc = useQueryClient();
+  return useApiMutation<AssignResponse, Error, string>({
+    mutationFn: (courtId) =>
+      apiFetch<AssignResponse>(
+        `/api/events/${eventId}/courts/${courtId}/assign`,
+        { method: "POST" },
+      ),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: eventKey(eventId) });
+    },
+  });
+}
