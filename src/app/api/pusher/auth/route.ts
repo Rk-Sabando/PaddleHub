@@ -9,6 +9,10 @@ export async function POST(req: Request) {
   const socketId = String(data.get("socket_id"));
   const channel = String(data.get("channel_name"));
 
+  if (channel.startsWith("private-user-") && channel !== `private-user-${user.id}`) {
+    return NextResponse.json({ error: "Forbidden channel" }, { status: 403 });
+  }
+
   const authResponse = pusherServer.authorizeChannel(socketId, channel, {
     user_id: user.id,
     user_info: { name: user.name, avatarUrl: user.avatarUrl ?? null },

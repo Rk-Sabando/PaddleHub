@@ -77,8 +77,30 @@ model User {
   managedCourts Court[]  @relation("CourtManager")
   hostedEvents  Event[]  @relation("EventHost")
   eventSignups  EventSignup[]
+  pushSubscriptions PushSubscription[]
 
   @@index([skillRating])
+}
+
+// Web Push API subscription. One row per (user, browser/device) — a user can
+// have many (laptop + phone). Pruned on 404/410 from the push service.
+// `origin` is the page origin (scheme + host) where the subscription was
+// created. It's recorded so we can prune subscriptions from orphan origins
+// (e.g. an old dev tunnel URL) when the user re-subscribes from a new one.
+model PushSubscription {
+  id        String   @id @default(cuid())
+  userId    String
+  endpoint  String   @unique
+  p256dh    String
+  auth      String
+  userAgent String?
+  origin    String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
 }
 
 // An Event is a scheduled gathering players sign up for. Matchmaking later

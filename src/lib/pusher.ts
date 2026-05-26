@@ -19,6 +19,7 @@ export const events = {
   participantJoined: "participant:joined",
   participantLeft: "participant:left",
   chatMessage: "chat:message",
+  userNotification: "user:notification",
 
   eventCreated: "event:created",
   eventUpdated: "event:updated",
