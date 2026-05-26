@@ -74,7 +74,7 @@ prisma/             Schema, migrations, seed
 tests/              Vitest + Playwright
 ```
 
-See `docs/architecture.md` for the system diagram.
+See `docs/architecture.md` for the system diagram and `docs/api.md` for the HTTP API reference.
 
 ## License
 

@@ -1,7 +1,11 @@
 {
   "permissions": {
     "allow": [
-      "Bash(npx prisma *)"
+      "Bash(npx prisma *)",
+      "PowerShell(git add .gitignore next.config.ts scripts/)",
+      "PowerShell(git reset HEAD package.json 2>&1)",
+      "PowerShell(git add 'src/app/\\(dashboard\\)/events/AdminEventsView.tsx')",
+      "PowerShell(git commit -F .tmp_commit_msg.txt)"
     ]
   }
 }
