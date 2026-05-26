@@ -51,3 +51,6 @@ prisma/*.db-journal
 
 # clerk configuration (can include secrets)
 /.clerk/
+
+# local dev tunnel binary (download via `pnpm run tunnel:install`)
+/tools/
