@@ -10,9 +10,9 @@ import type {
 import { CourtStatus, MatchStatus } from "@prisma/client";
 import { Plus, Timer, Trophy } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { EndGameButton } from "@/components/matches/EndGameButton";
 import { useToast } from "@/hooks/use-toast";
 import { useAssignMatchToCourt } from "@/hooks/useEvents";
-import { useEndAndAdvanceMatch } from "@/hooks/useMatches";
 import { MatchTimer } from "../MatchTimer";
 import { CourtStatusEditor } from "./CourtStatusEditor";
 
@@ -29,7 +29,6 @@ type Props = {
 export function EventCourtCard({ eventId, court, matches }: Props) {
   const router = useRouter();
   const { toast } = useToast();
-  const end = useEndAndAdvanceMatch();
   const assign = useAssignMatchToCourt(eventId);
 
   // At most one match should be CONFIRMED on a court at a time. If multiple
@@ -41,21 +40,6 @@ export function EventCourtCard({ eventId, court, matches }: Props) {
         (a, b) =>
           (b.startedAt?.getTime() ?? 0) - (a.startedAt?.getTime() ?? 0),
       )[0] ?? null;
-
-  const handleEnd = () => {
-    if (!active) return;
-    end.mutate(active.id, {
-      onSuccess: (data) => {
-        toast({
-          title: "Match ended",
-          description: data.nextMatchId
-            ? `New match assigned: ${data.nextParticipants.map((p) => p.name).join(", ")}`
-            : "No more players available — court is now idle.",
-        });
-        router.refresh();
-      },
-    });
-  };
 
   return (
     <div className="flex flex-col gap-3 rounded-lg border bg-card p-4 shadow-sm">
@@ -99,15 +83,7 @@ export function EventCourtCard({ eventId, court, matches }: Props) {
                 <span className="text-sm">—</span>
               )}
             </div>
-            <Button
-              type="button"
-              size="sm"
-              variant="outline"
-              disabled={end.isPending}
-              onClick={handleEnd}
-            >
-              {end.isPending ? "Ending…" : "End game"}
-            </Button>
+            <EndGameButton matchId={active.id} />
           </div>
         </>
       ) : court.status === CourtStatus.AVAILABLE ? (

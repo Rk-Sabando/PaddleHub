@@ -93,8 +93,8 @@ type EndAndAdvanceResponse = {
   nextParticipants: { userId: string; name: string }[];
 };
 
-// Ends the active match on a court and auto-assigns the next group from the
-// parent event's confirmed signup pool. Used by the courts board.
+// Ends the active match on a court and promotes the next queued match if one
+// is waiting. If not, the court remains idle. Used by the courts board.
 export function useEndAndAdvanceMatch() {
   const qc = useQueryClient();
   return useApiMutation<EndAndAdvanceResponse, Error, string>({

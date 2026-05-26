@@ -1,6 +1,5 @@
 "use client";
 
-import { useRouter } from "next/navigation";
 import {
   type Court,
   type CourtStatus,
@@ -10,9 +9,7 @@ import {
   MatchStatus,
 } from "@prisma/client";
 import { Timer, Trophy } from "lucide-react";
-import { Button } from "@/components/ui/button";
-import { useToast } from "@/hooks/use-toast";
-import { useEndAndAdvanceMatch } from "@/hooks/useMatches";
+import { EndGameButton } from "@/components/matches/EndGameButton";
 import { MatchTimer } from "./MatchTimer";
 
 export type CourtMatchCardItem = Match & {
@@ -35,24 +32,7 @@ const matchStatusStyles: Record<MatchStatus, string> = {
 };
 
 export function CourtMatchCard({ match }: { match: CourtMatchCardItem }) {
-  const router = useRouter();
-  const { toast } = useToast();
-  const end = useEndAndAdvanceMatch();
   const isActive = match.status === MatchStatus.CONFIRMED;
-
-  const handleEnd = () => {
-    end.mutate(match.id, {
-      onSuccess: (data) => {
-        toast({
-          title: "Match ended",
-          description: data.nextMatchId
-            ? `New match assigned: ${data.nextParticipants.map((p) => p.name).join(", ")}`
-            : "No more players available — court is now idle.",
-        });
-        router.refresh();
-      },
-    });
-  };
 
   return (
     <div className="flex flex-col gap-3 rounded-lg border bg-card p-4 shadow-sm">
@@ -105,17 +85,7 @@ export function CourtMatchCard({ match }: { match: CourtMatchCardItem }) {
             <span className="text-sm">—</span>
           )}
         </div>
-        {isActive && (
-          <Button
-            type="button"
-            size="sm"
-            variant="outline"
-            disabled={end.isPending}
-            onClick={handleEnd}
-          >
-            {end.isPending ? "Ending…" : "End game"}
-          </Button>
-        )}
+        {isActive && <EndGameButton matchId={match.id} />}
       </div>
     </div>
   );
