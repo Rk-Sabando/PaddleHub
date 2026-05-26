@@ -21,3 +21,8 @@ export const createEventSchema = z
   });
 
 export type CreateEventInput = z.infer<typeof createEventSchema>;
+
+// Edits use the same shape as create. Status is excluded — it has its own
+// transition logic on the existing PATCH path.
+export const updateEventSchema = createEventSchema;
+export type UpdateEventInput = z.infer<typeof updateEventSchema>;

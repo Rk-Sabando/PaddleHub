@@ -8,12 +8,15 @@ import { useStartMatchmaking } from "@/hooks/useEvents";
 
 type Props = {
   eventId: string;
+  confirmedCount: number;
 };
 
-export function StartMatchmakingButton({ eventId }: Props) {
+export function StartMatchmakingButton({ eventId, confirmedCount }: Props) {
   const router = useRouter();
   const { toast } = useToast();
   const start = useStartMatchmaking(eventId);
+
+  const noPlayers = confirmedCount === 0;
 
   const run = () =>
     start.mutate(undefined, {
@@ -35,7 +38,12 @@ export function StartMatchmakingButton({ eventId }: Props) {
     });
 
   return (
-    <Button type="button" size="sm" disabled={start.isPending} onClick={run}>
+    <Button
+      type="button"
+      size="sm"
+      disabled={start.isPending || noPlayers}
+      onClick={run}
+    >
       <Shuffle className="mr-1 h-4 w-4" />
       {start.isPending ? "Pairing players…" : "Start matchmaking"}
     </Button>

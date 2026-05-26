@@ -6,6 +6,7 @@ import {
   requireRole,
 } from "@/lib/auth";
 import {
+  EventNotStartedError,
   EventTerminalError,
   MatchmakingAlreadyRunError,
   NoAvailableCourtsError,
@@ -41,7 +42,8 @@ export async function POST(
       err instanceof MatchmakingAlreadyRunError ||
       err instanceof NotEnoughPlayersError ||
       err instanceof NoAvailableCourtsError ||
-      err instanceof EventTerminalError
+      err instanceof EventTerminalError ||
+      err instanceof EventNotStartedError
     ) {
       return NextResponse.json({ error: err.message }, { status: err.status });
     }

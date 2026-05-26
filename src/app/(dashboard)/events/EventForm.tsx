@@ -3,6 +3,7 @@
 import { useRouter } from "next/navigation";
 import { Controller, useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
+import type { Event } from "@prisma/client";
 import { Button } from "@/components/ui/button";
 import { DateTimePicker } from "@/components/ui/datetime-picker";
 import { Input } from "@/components/ui/input";
@@ -15,19 +16,26 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { useToast } from "@/hooks/use-toast";
-import { useCreateEvent } from "@/hooks/useEvents";
-import { createEventSchema, type CreateEventInput } from "@/lib/validators/event";
+import { useCreateEvent, useUpdateEvent } from "@/hooks/useEvents";
+import {
+  createEventSchema,
+  type CreateEventInput,
+} from "@/lib/validators/event";
 
 type Props = {
-  // Called after a successful create, before router.refresh(). Use this to
-  // close a containing dialog, etc.
+  // Omit `event` for create mode. Pass an event to edit it.
+  event?: Event;
+  // Called on success before router.refresh(). Use this to close a dialog.
   onSuccess?: () => void;
 };
 
-export function CreateEventForm({ onSuccess }: Props = {}) {
+export function EventForm({ event, onSuccess }: Props = {}) {
   const router = useRouter();
   const { toast } = useToast();
   const createEvent = useCreateEvent();
+  const updateEvent = useUpdateEvent(event?.id ?? "");
+  const isEdit = !!event;
+  const mutation = isEdit ? updateEvent : createEvent;
 
   const {
     register,
@@ -37,19 +45,30 @@ export function CreateEventForm({ onSuccess }: Props = {}) {
     formState: { errors },
   } = useForm<CreateEventInput>({
     resolver: zodResolver(createEventSchema),
-    defaultValues: {
-      format: "DOUBLES",
-      capacity: 16,
-      skillMin: 1,
-      skillMax: 5,
-    },
+    defaultValues: isEdit
+      ? {
+          name: event.name,
+          description: event.description ?? "",
+          scheduledAt: event.scheduledAt,
+          endsAt: event.endsAt ?? undefined,
+          format: event.format,
+          capacity: event.capacity,
+          skillMin: event.skillMin,
+          skillMax: event.skillMax,
+        }
+      : {
+          format: "DOUBLES",
+          capacity: 16,
+          skillMin: 1,
+          skillMax: 5,
+        },
   });
 
   const onSubmit = (values: CreateEventInput) =>
-    createEvent.mutate(values, {
+    mutation.mutate(values, {
       onSuccess: () => {
-        reset();
-        toast({ title: "Event created" });
+        if (!isEdit) reset();
+        toast({ title: isEdit ? "Event updated" : "Event created" });
         onSuccess?.();
         router.refresh();
       },
@@ -166,8 +185,14 @@ export function CreateEventForm({ onSuccess }: Props = {}) {
       </div>
 
       <div className="md:col-span-2">
-        <Button type="submit" disabled={createEvent.isPending}>
-          {createEvent.isPending ? "Creating…" : "Create event"}
+        <Button type="submit" disabled={mutation.isPending}>
+          {mutation.isPending
+            ? isEdit
+              ? "Saving…"
+              : "Creating…"
+            : isEdit
+              ? "Save changes"
+              : "Create event"}
         </Button>
       </div>
     </form>

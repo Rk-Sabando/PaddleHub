@@ -9,8 +9,10 @@ import type {
 import { EventStatus, MatchStatus, SignupStatus } from "@prisma/client";
 import type { Route } from "next";
 import Link from "next/link";
+import { Pencil } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { EventRealtimeRefresher } from "@/components/events/EventRealtimeRefresher";
+import { EditEventDialog } from "../EditEventDialog";
 import { CourtMatchCard } from "./CourtMatchCard";
 import { EventStatusControl } from "./EventStatusControl";
 import { QueuedMatchCard } from "./QueuedMatchCard";
@@ -78,7 +80,24 @@ export function AdminEventDetail({ event }: { event: DetailEvent }) {
           </p>
           {event.description && <p className="mt-2 max-w-prose text-sm">{event.description}</p>}
         </div>
-        <EventStatusControl eventId={event.id} status={event.status} />
+        <div className="flex flex-col items-end gap-2">
+          {event.status === EventStatus.OPEN && (
+            <EditEventDialog
+              event={event}
+              triggerLabel={
+                <>
+                  <Pencil className="mr-1 h-4 w-4" />
+                  Edit event
+                </>
+              }
+            />
+          )}
+          <EventStatusControl
+            eventId={event.id}
+            status={event.status}
+            confirmedCount={confirmed.length}
+          />
+        </div>
       </header>
 
       <section>
@@ -126,9 +145,11 @@ export function AdminEventDetail({ event }: { event: DetailEvent }) {
           </h2>
           <div className="flex items-center gap-2">
             {event.matches.length === 0 &&
-              event.status !== EventStatus.COMPLETED &&
-              event.status !== EventStatus.CANCELLED && (
-                <StartMatchmakingButton eventId={event.id} />
+              event.status === EventStatus.IN_PROGRESS && (
+                <StartMatchmakingButton
+                  eventId={event.id}
+                  confirmedCount={confirmed.length}
+                />
               )}
             <Button asChild size="sm" variant="outline">
               <Link href={`/events/${event.id}/matches` as Route}>

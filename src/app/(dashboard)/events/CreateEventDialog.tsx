@@ -11,7 +11,7 @@ import {
   DialogTitle,
   DialogTrigger,
 } from "@/components/ui/dialog";
-import { CreateEventForm } from "./CreateEventForm";
+import { EventForm } from "./EventForm";
 
 export function CreateEventDialog() {
   const [open, setOpen] = useState(false);
@@ -32,7 +32,7 @@ export function CreateEventDialog() {
             once it&apos;s open.
           </DialogDescription>
         </DialogHeader>
-        <CreateEventForm onSuccess={() => setOpen(false)} />
+        <EventForm onSuccess={() => setOpen(false)} />
       </DialogContent>
     </Dialog>
   );

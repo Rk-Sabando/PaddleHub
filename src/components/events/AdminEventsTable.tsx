@@ -2,7 +2,8 @@
 
 import type { Route } from "next";
 import Link from "next/link";
-import type { Event, User } from "@prisma/client";
+import { EventStatus, type Event, type User } from "@prisma/client";
+import { EditEventDialog } from "@/app/(dashboard)/events/EditEventDialog";
 import { Pagination, usePagination } from "@/components/shared/Pagination";
 
 export type AdminEventRow = Event & {
@@ -38,6 +39,7 @@ export function AdminEventsTable({
               <th className="px-3 py-2 font-medium">Format</th>
               <th className="px-3 py-2 font-medium">Signups</th>
               <th className="px-3 py-2 font-medium">Status</th>
+              <th className="px-3 py-2" />
             </tr>
           </thead>
           <tbody className="divide-y">
@@ -60,6 +62,9 @@ export function AdminEventsTable({
                   {e._count.signups}/{e.capacity}
                 </td>
                 <td className="px-3 py-2">{e.status}</td>
+                <td className="px-3 py-2 text-right">
+                  {e.status === EventStatus.OPEN && <EditEventDialog event={e} />}
+                </td>
               </tr>
             ))}
           </tbody>

@@ -4,7 +4,7 @@ import { useQueryClient } from "@tanstack/react-query";
 import type { Event, EventStatus } from "@prisma/client";
 import { apiFetch } from "@/lib/apiClient";
 import { useApiMutation } from "./useApiMutation";
-import type { CreateEventInput } from "@/lib/validators/event";
+import type { CreateEventInput, UpdateEventInput } from "@/lib/validators/event";
 
 // Used by react-query for any future client queries; mutations invalidate this
 // key so a switch to client-side fetching later is a no-op.
@@ -21,6 +21,23 @@ export function useCreateEvent() {
       apiFetch<CreateEventResponse>("/api/events", { method: "POST", body: input }),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: eventsKey });
+    },
+  });
+}
+
+type UpdateEventResponse = { event: Event };
+
+export function useUpdateEvent(eventId: string) {
+  const qc = useQueryClient();
+  return useApiMutation<UpdateEventResponse, Error, UpdateEventInput>({
+    mutationFn: (input) =>
+      apiFetch<UpdateEventResponse>(`/api/events/${eventId}`, {
+        method: "PATCH",
+        body: input,
+      }),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: eventsKey });
+      qc.invalidateQueries({ queryKey: eventKey(eventId) });
     },
   });
 }

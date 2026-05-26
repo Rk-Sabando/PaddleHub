@@ -10,7 +10,7 @@ import { db } from "@/lib/db";
 import { channels, events as pusherEvents } from "@/lib/pusher";
 import { pusherServer } from "@/lib/pusher-server";
 import { sendPushToUser, sendPushToUsers } from "@/lib/push";
-import type { CreateEventInput } from "@/lib/validators/event";
+import type { CreateEventInput, UpdateEventInput } from "@/lib/validators/event";
 
 // Per-event transaction lock. Serializes mutations of one event's match queue
 // (court ends, manual assignments, queue top-ups) so two parallel "End game"
@@ -116,6 +116,15 @@ export class NoAvailableCourtsError extends Error {
   status = 409;
 }
 export class EventTerminalError extends Error {
+  status = 409;
+}
+export class EventNotFoundError extends Error {
+  status = 404;
+}
+export class EventNotEditableError extends Error {
+  status = 409;
+}
+export class EventNotStartedError extends Error {
   status = 409;
 }
 
@@ -360,6 +369,26 @@ function formatTeams(teams: QueueMatchTeams<QueuePlayer>) {
   };
 }
 
+// Queue gate: queued matches may only be auto-formed when the event is live
+// AND matchmaking has been initiated. "Matchmaking initiated" is detected by
+// the existence of at least one match for the event — matchmake() refuses to
+// re-run once matches exist, so this signal is stable. Also respects the
+// per-event matchmaking-pause toggle.
+async function canFormQueue(
+  tx: Prisma.TransactionClient,
+  eventId: string,
+): Promise<boolean> {
+  const event = await tx.event.findUnique({
+    where: { id: eventId },
+    select: { status: true, matchmakingDisabled: true },
+  });
+  if (!event) return false;
+  if (event.matchmakingDisabled) return false;
+  if (event.status !== EventStatus.IN_PROGRESS) return false;
+  const matchCount = await tx.match.count({ where: { eventId } });
+  return matchCount > 0;
+}
+
 // Forms one OPEN queued match (no court yet) from the signup pool if there
 // are enough confirmed players not currently in another active/queued match.
 // Called from inside a transaction.
@@ -368,9 +397,11 @@ async function formOneQueuedMatch(
   eventId: string,
   format: MatchFormat,
 ): Promise<boolean> {
-  // Check if matchmaking is disabled for this event
-  const event = await tx.event.findUnique({ where: { id: eventId }, select: { matchmakingDisabled: true } });
-  if (event?.matchmakingDisabled) return false;
+  // Hard gate: queue items only get auto-formed once the admin has started the
+  // event AND kicked off matchmaking. Stops side-effect callers (confirmSignup,
+  // setOptOut resume, etc.) from forming queued matches before the event is
+  // live or before the initial matchmake() pass has run.
+  if (!(await canFormQueue(tx, eventId))) return false;
   const perMatch = format === MatchFormat.DOUBLES ? 4 : 2;
   const inMatch = await tx.matchParticipant.findMany({
     where: {
@@ -447,9 +478,7 @@ async function topUpQueue(
   eventId: string,
   format: MatchFormat,
 ): Promise<number> {
-  // Check if matchmaking is disabled for this event
-  const event = await tx.event.findUnique({ where: { id: eventId }, select: { matchmakingDisabled: true } });
-  if (event?.matchmakingDisabled) return 0;
+  if (!(await canFormQueue(tx, eventId))) return 0;
   let added = 0;
   while (true) {
     const queued = await tx.match.count({
@@ -559,6 +588,47 @@ export const eventService = {
       name: event.name,
     });
     return event;
+  },
+
+  // Admin edits the configurable fields of an event. Only allowed while the
+  // event is still OPEN — once it's IN_PROGRESS the schedule/format/capacity
+  // are baked into running matches and the queue, and we'd rather force a
+  // cancel-and-recreate than try to repair that state.
+  async update(eventId: string, input: UpdateEventInput) {
+    const event = await db.event.findUnique({ where: { id: eventId } });
+    if (!event) throw new EventNotFoundError("Event not found");
+    if (event.status !== EventStatus.OPEN) {
+      throw new EventNotEditableError(
+        "Only upcoming events can be edited. Cancel and recreate if changes are needed.",
+      );
+    }
+    const confirmedCount = await db.eventSignup.count({
+      where: { eventId, status: SignupStatus.CONFIRMED },
+    });
+    if (input.capacity < confirmedCount) {
+      throw new EventCapacityError(
+        `Capacity (${input.capacity}) is below the ${confirmedCount} already-confirmed players.`,
+      );
+    }
+    const updated = await db.event.update({
+      where: { id: eventId },
+      data: {
+        name: input.name,
+        description: input.description?.trim() ? input.description.trim() : null,
+        scheduledAt: input.scheduledAt,
+        endsAt: input.endsAt ?? null,
+        format: input.format,
+        capacity: input.capacity,
+        skillMin: input.skillMin,
+        skillMax: input.skillMax,
+      },
+      include: adminEventInclude,
+    });
+    await Promise.all([
+      broadcast(channels.event(eventId), pusherEvents.eventUpdated, { id: eventId }),
+      broadcast(channels.eventsFeed, pusherEvents.eventUpdated, { id: eventId }),
+    ]);
+    return updated;
   },
 
   async updateStatus(eventId: string, next: EventStatus) {
@@ -823,6 +893,14 @@ export const eventService = {
       event.status === EventStatus.CANCELLED
     ) {
       throw new EventTerminalError("Event is not active");
+    }
+    // Matchmaking forms the initial queue, so block it until the event is
+    // actually started. This is what makes "do not create queue unless event
+    // started and matchmaking started" hold for the queue-side as well.
+    if (event.status !== EventStatus.IN_PROGRESS) {
+      throw new EventNotStartedError(
+        "Start the event before running matchmaking.",
+      );
     }
     if (event._count.matches > 0) {
       throw new MatchmakingAlreadyRunError(
