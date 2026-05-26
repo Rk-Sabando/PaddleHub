@@ -10,6 +10,22 @@ export type PushState =
   | "default" // never asked yet
   | "subscribed"; // active PushSubscription matches us
 
+// True when the page is running as an installed PWA (standalone display mode).
+// iOS and many Android configurations only deliver background web push to
+// installed PWAs, so we use this to gate the subscribe UI — a subscription
+// made from a regular browser tab tends to either never fire in the
+// background or stop firing as soon as the tab is closed.
+function detectStandalone(): boolean {
+  if (typeof window === "undefined") return false;
+  if (window.matchMedia?.("(display-mode: standalone)").matches) return true;
+  // iOS Safari exposes its own legacy flag on `navigator`.
+  const nav = window.navigator as Navigator & { standalone?: boolean };
+  if (nav.standalone === true) return true;
+  // Trusted Web Activity (Chrome Android wrapping the PWA).
+  if (document.referrer.startsWith("android-app://")) return true;
+  return false;
+}
+
 function urlBase64ToUint8Array(base64String: string): Uint8Array {
   const padding = "=".repeat((4 - (base64String.length % 4)) % 4);
   const base64 = (base64String + padding).replace(/-/g, "+").replace(/_/g, "/");
@@ -37,6 +53,18 @@ async function getRegistration(): Promise<ServiceWorkerRegistration> {
 export function usePushSubscription() {
   const [state, setState] = useState<PushState>("loading");
   const [busy, setBusy] = useState(false);
+  const [isStandalone, setIsStandalone] = useState(false);
+
+  useEffect(() => {
+    setIsStandalone(detectStandalone());
+    // display-mode flips when the user installs / launches the PWA. Track it
+    // so the UI moves from "Install the app" to "Enable push" without a reload.
+    const mq = window.matchMedia?.("(display-mode: standalone)");
+    if (!mq) return;
+    const onChange = () => setIsStandalone(detectStandalone());
+    mq.addEventListener("change", onChange);
+    return () => mq.removeEventListener("change", onChange);
+  }, []);
 
   const refresh = useCallback(async () => {
     if (!isSupported()) {
@@ -135,5 +163,5 @@ export function usePushSubscription() {
     }
   }, [refresh]);
 
-  return { state, busy, subscribe, unsubscribe };
+  return { state, busy, isStandalone, subscribe, unsubscribe };
 }

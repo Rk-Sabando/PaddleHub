@@ -1,15 +1,38 @@
 "use client";
 
-import { Bell, BellOff } from "lucide-react";
+import { Bell, BellOff, Download } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { usePushSubscription } from "@/hooks/usePushSubscription";
 
 // Inline banner: gives players a one-tap opt-in for background match
 // notifications. Hides itself when the browser doesn't support push at all.
 export function EnablePushBanner() {
-  const { state, busy, subscribe, unsubscribe } = usePushSubscription();
+  const { state, busy, isStandalone, subscribe, unsubscribe } =
+    usePushSubscription();
 
   if (state === "loading" || state === "unsupported") return null;
+
+  // Background web push is unreliable from a regular browser tab — iOS only
+  // delivers to installed PWAs, and many Android configurations suspend tab
+  // push as soon as the tab is closed. Surface the install step before the
+  // subscribe button so the first subscription is made from the right context.
+  if (!isStandalone && state !== "subscribed") {
+    return (
+      <div className="flex flex-col gap-2 rounded-md border border-dashed bg-card p-3 text-sm sm:flex-row sm:items-start sm:justify-between sm:gap-3">
+        <div className="flex min-w-0 items-start gap-2">
+          <Download className="mt-0.5 h-4 w-4 shrink-0 text-muted-foreground" />
+          <div className="min-w-0">
+            <div className="font-medium">Install the app for notifications</div>
+            <p className="text-xs text-muted-foreground">
+              Background push only fires reliably from the installed PaddleHub
+              app. Use your browser&apos;s install / &quot;Add to Home
+              Screen&quot; option, then open it from the home screen to enable.
+            </p>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   if (state === "denied") {
     return (
