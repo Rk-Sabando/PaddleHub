@@ -1,25 +1,11 @@
 import type { Route } from "next";
 import Link from "next/link";
-import { Role } from "@prisma/client";
 import { requireAuth } from "@/lib/auth";
-
-type NavItem = { href: string; label: string };
-
-const playerNav: NavItem[] = [
-  { href: "/dashboard", label: "Dashboard" },
-  { href: "/events", label: "Event" },
-  { href: "/settings", label: "Settings" },
-];
-
-const adminNav: NavItem[] = [
-  { href: "/dashboard", label: "Dashboard" },
-  { href: "/events", label: "Events" },
-  { href: "/courts", label: "Courts" },
-];
+import { navItemsForRole } from "@/lib/nav";
 
 export async function Sidebar() {
   const user = await requireAuth();
-  const items = user.role === Role.ADMIN ? adminNav : playerNav;
+  const items = navItemsForRole(user.role);
 
   return (
     <aside className="hidden w-56 border-r p-4 md:block">
