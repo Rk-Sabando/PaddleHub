@@ -1,5 +1,6 @@
 import type { Route } from "next";
 import Link from "next/link";
+import { ArrowRight, Calendar } from "lucide-react";
 import { EventStatus, MatchStatus, Role, SignupStatus } from "@prisma/client";
 import { db } from "@/lib/db";
 import { requireAuth } from "@/lib/auth";
@@ -8,7 +9,9 @@ import { EventsFeedRealtimeRefresher } from "@/components/events/EventsFeedRealt
 import { JoinedEventsList } from "@/components/dashboard/JoinedEventsList";
 import { MatchHistoryList } from "@/components/dashboard/MatchHistoryList";
 import { PlayersTable } from "@/components/dashboard/PlayersTable";
+import { EnablePushBanner } from "@/components/push/EnablePushBanner";
 import { Button } from "@/components/ui/button";
+import { formatEventStatus } from "@/lib/eventStatus";
 
 export const dynamic = "force-dynamic";
 
@@ -117,6 +120,12 @@ async function PlayerDashboard({ userId }: { userId: string }) {
     }),
   ]);
 
+  // "Current" = soonest event the player is on the roster for that hasn't
+  // ended. joinedEvents is already filtered to OPEN/IN_PROGRESS and ordered by
+  // scheduledAt asc — so the first row is the right one.
+  const current = joinedEvents[0]?.event ?? null;
+  const currentStatus = current?.status ?? null;
+
   return (
     <div className="space-y-10">
       <EventsFeedRealtimeRefresher />
@@ -127,6 +136,41 @@ async function PlayerDashboard({ userId }: { userId: string }) {
           Events you&apos;ve joined and your match history.
         </p>
       </header>
+
+      <EnablePushBanner />
+
+      {current && (
+        <Link
+          href={`/events/${current.id}` as Route}
+          className="group flex items-center justify-between gap-3 rounded-lg border bg-card p-4 transition-colors hover:bg-accent"
+        >
+          <div className="flex min-w-0 items-start gap-3">
+            <Calendar className="mt-0.5 h-5 w-5 shrink-0 text-muted-foreground" />
+            <div className="min-w-0">
+              <div className="flex flex-wrap items-center gap-2">
+                <span className="truncate text-base font-semibold">{current.name}</span>
+                {currentStatus && (
+                  <span
+                    className={
+                      currentStatus === EventStatus.IN_PROGRESS
+                        ? "rounded-full bg-emerald-100 px-2 py-0.5 text-xs font-medium text-emerald-800"
+                        : "rounded-full bg-zinc-100 px-2 py-0.5 text-xs font-medium text-zinc-700"
+                    }
+                  >
+                    {formatEventStatus(currentStatus)}
+                  </span>
+                )}
+              </div>
+              <div className="break-words text-xs text-muted-foreground">
+                {currentStatus === EventStatus.IN_PROGRESS
+                  ? "Tap to see your court assignment and matchmaking."
+                  : `${current.scheduledAt.toISOString().slice(0, 16).replace("T", " ")} · jump straight in`}
+              </div>
+            </div>
+          </div>
+          <ArrowRight className="h-5 w-5 shrink-0 text-muted-foreground transition-transform group-hover:translate-x-0.5" />
+        </Link>
+      )}
 
       <section className="space-y-3">
         <div className="flex items-end justify-between">

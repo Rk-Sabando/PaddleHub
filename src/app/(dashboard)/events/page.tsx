@@ -18,5 +18,5 @@ export default async function EventsPage() {
     eventService.getCurrentForPlayer(user.id),
     eventService.listForPlayer(user.id),
   ]);
-  return <PlayerEventsView current={current} browseable={browseable} />;
+  return <PlayerEventsView current={current as any} browseable={browseable} />;
 }

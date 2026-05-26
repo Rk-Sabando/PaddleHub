@@ -1,8 +1,9 @@
 import type { Route } from "next";
 import Link from "next/link";
 import type { Court, Event, Match, MatchParticipant, User } from "@prisma/client";
-import { SignupStatus } from "@prisma/client";
+import { EventStatus, SignupStatus } from "@prisma/client";
 import { EventsFeedRealtimeRefresher } from "@/components/events/EventsFeedRealtimeRefresher";
+import { formatEventStatus } from "@/lib/eventStatus";
 import { BrowseableEventsList, type BrowseableEventRow } from "./BrowseableEventsList";
 import { SignupButton } from "./SignupButton";
 
@@ -66,7 +67,7 @@ function CurrentEventCard({ event }: { event: CurrentEvent }) {
           {event.description && <p className="mt-2 text-sm">{event.description}</p>}
         </div>
         <div className="text-right text-sm">
-          <div className="font-medium">{event.status}</div>
+          <div className="font-medium">{formatEventStatus(event.status)}</div>
           <div className="text-xs text-muted-foreground">
             {event._count.signups}/{event.capacity} confirmed
           </div>
@@ -91,7 +92,7 @@ function CurrentEventCard({ event }: { event: CurrentEvent }) {
           <ul className="divide-y rounded border">
             {event.matches.map((m) => (
               <li key={m.id} className="p-3 text-sm">
-                <div className="font-medium">{m.court.name}</div>
+                <div className="font-medium">{m?.court?.name}</div>
                 <div className="text-xs text-muted-foreground">
                   {m.scheduledAt.toISOString().slice(11, 16)} ·{" "}
                   {m.participants.map((p) => p.user.name).join(", ")}
@@ -103,7 +104,12 @@ function CurrentEventCard({ event }: { event: CurrentEvent }) {
       </div>
 
       <div className="mt-4 flex justify-end">
-        <SignupButton eventId={event.id} signedUp withdrawOnly />
+        <SignupButton
+          eventId={event.id}
+          signedUp
+          withdrawOnly
+          hideWithdraw={event.status === EventStatus.IN_PROGRESS}
+        />
       </div>
     </section>
   );

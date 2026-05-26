@@ -9,9 +9,18 @@ type Props = {
   signedUp: boolean;
   disabled?: boolean;
   withdrawOnly?: boolean;
+  // When true, suppresses the Withdraw button for already-signed-up players —
+  // used once the event has started, where "Sit out" is the appropriate exit.
+  hideWithdraw?: boolean;
 };
 
-export function SignupButton({ eventId, signedUp, disabled, withdrawOnly }: Props) {
+export function SignupButton({
+  eventId,
+  signedUp,
+  disabled,
+  withdrawOnly,
+  hideWithdraw,
+}: Props) {
   const router = useRouter();
   const onSuccess = () => router.refresh();
 
@@ -20,6 +29,7 @@ export function SignupButton({ eventId, signedUp, disabled, withdrawOnly }: Prop
   const busy = request.isPending || withdraw.isPending;
 
   if (signedUp) {
+    if (hideWithdraw) return null;
     return (
       <Button
         type="button"

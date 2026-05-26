@@ -171,7 +171,7 @@ export function AdminEventDetail({ event }: { event: DetailEvent }) {
       {waitingPlayers.length > 0 && (
         <section>
           <h2 className="mb-1 text-lg font-medium">
-            Waiting to be paired{" "}
+            Waiting List{" "}
             <span className="text-muted-foreground">({waitingPlayers.length})</span>
           </h2>
           <p className="mb-3 text-xs text-muted-foreground">

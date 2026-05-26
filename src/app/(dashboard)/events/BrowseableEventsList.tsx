@@ -39,16 +39,16 @@ export function BrowseableEventsList({
           return (
             <li
               key={e.id}
-              className="flex items-center justify-between rounded-md border p-4"
+              className="flex flex-wrap items-center justify-between gap-3 rounded-md border p-4"
             >
-              <div>
+              <div className="min-w-0 flex-1">
                 <Link
                   href={`/events/${e.id}` as Route}
-                  className="font-medium hover:underline"
+                  className="break-words font-medium hover:underline"
                 >
                   {e.name}
                 </Link>
-                <div className="text-xs text-muted-foreground">
+                <div className="break-words text-xs text-muted-foreground">
                   {e.scheduledAt.toISOString().slice(0, 16).replace("T", " ")} ·{" "}
                   {e.format} · {e._count.signups}/{e.capacity} confirmed
                 </div>

@@ -36,8 +36,8 @@ export function useApiMutation<
 
   return useMutation<TData, TError, TVariables, TContext>({
     ...rest,
-    onError: (error, variables, context) => {
-      onError?.(error, variables, context);
+    onError: (error, variables, context, mutation) => {
+      onError?.(error, variables, context, mutation);
       if (silenceErrorToast) return;
       const message =
         error instanceof Error ? error.message : "Please try again.";
