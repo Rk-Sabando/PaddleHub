@@ -40,10 +40,36 @@ export function useUpdateEventStatus(eventId: string) {
   });
 }
 
+type ToggleMatchmakingResponse = { event: Event };
+
+export function useToggleMatchmakingDisabled(eventId: string) {
+  const qc = useQueryClient();
+  return useApiMutation<ToggleMatchmakingResponse, Error, boolean>({
+    mutationFn: (matchmakingDisabled) =>
+      apiFetch<ToggleMatchmakingResponse>(`/api/events/${eventId}/matchmaking-disabled`, {
+        method: "PATCH",
+        body: { matchmakingDisabled },
+      }),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: eventsKey });
+      qc.invalidateQueries({ queryKey: eventKey(eventId) });
+    },
+  });
+}
+
 type MatchmakeResponse = {
   ok: boolean;
   created: number;
+  matchObjects: {
+    teamA: { userId: string; name: string; skillRating: number; gamesPlayed: number }[];
+    teamB: { userId: string; name: string; skillRating: number; gamesPlayed: number }[];
+  }[];
   leftover: { userId: string; name: string }[];
+  validation: {
+    oddPlayersInQueue: boolean;
+    playersWithoutSkillMatch: { userId: string; name: string; skillRating: number }[];
+    starvationPrevented: { userId: string; name: string; rotations: number }[];
+  };
   perMatch: number;
   courtsUsed: number;
 };

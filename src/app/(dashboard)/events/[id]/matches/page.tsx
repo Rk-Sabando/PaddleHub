@@ -10,6 +10,7 @@ import { EventRealtimeRefresher } from "@/components/events/EventRealtimeRefresh
 import { QueuedMatchCard } from "../QueuedMatchCard";
 import { WaitingPlayersList } from "../WaitingPlayersList";
 import { EventCourtCard } from "./EventCourtCard";
+import { MatchmakingToggleButton } from "./MatchMakingToggleButton";
 
 export const dynamic = "force-dynamic";
 
@@ -27,15 +28,16 @@ export default async function EventMatchesPage({
   ]);
   if (!event) notFound();
 
-  // Group matches by courtId. Queued matches (courtId=null) go to their own
-  // section below the court grid.
+  // Group matches by courtId. Only OPEN matches without a court belong in the
+  // queue; completed/cancelled rows should never be shown as queued.
   const matchesByCourt = new Map<string, typeof event.matches>();
   const queued: typeof event.matches = [];
   for (const m of event.matches) {
-    if (!m.courtId) {
+    if (m.status === MatchStatus.OPEN && !m.courtId) {
       queued.push(m);
       continue;
     }
+    if (!m.courtId) continue;
     const bucket = matchesByCourt.get(m.courtId) ?? [];
     bucket.push(m);
     matchesByCourt.set(m.courtId, bucket);
@@ -79,6 +81,14 @@ export default async function EventMatchesPage({
             a court&apos;s status inline to mark it unavailable.
           </p>
         </div>
+        {event.status === "IN_PROGRESS" && (
+          <>
+            <MatchmakingToggleButton eventId={event.id} matchmakingDisabled={event.matchmakingDisabled} />
+            {event.matchmakingDisabled && (
+              <div className="mt-2 text-sm text-red-600">Matchmaking is currently stopped. No new matches will be formed, but the queue will drain.</div>
+            )}
+          </>
+        )}
       </header>
 
       <section className="space-y-3">

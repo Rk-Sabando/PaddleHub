@@ -24,7 +24,9 @@ export async function POST(
     return NextResponse.json({
       ok: true,
       created: result.matches.length,
+      matchObjects: result.matchObjects,
       leftover: result.leftover,
+      validation: result.validation,
       perMatch: result.perMatch,
       courtsUsed: result.courtsUsed,
     });

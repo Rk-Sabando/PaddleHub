@@ -119,6 +119,7 @@ model Event {
   skillMin    Float       @default(1.0)
   skillMax    Float       @default(5.0)
   status      EventStatus @default(OPEN)
+  matchmakingDisabled Boolean @default(false)
   createdAt   DateTime    @default(now())
   updatedAt   DateTime    @updatedAt
 
@@ -133,6 +134,10 @@ model EventSignup {
   eventId     String
   userId      String
   status      SignupStatus @default(PENDING)
+  // When true, the player remains on the roster + match history but is
+  // excluded from future matchmaking pool reads. Reversible — player can
+  // resume matchmaking from the event detail page while the event is live.
+  optedOut    Boolean      @default(false)
   decidedAt   DateTime?
   decidedById String?
   createdAt   DateTime     @default(now())

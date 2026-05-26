@@ -34,6 +34,22 @@ export function useWithdrawSignup(eventId: string) {
   });
 }
 
+// Player: toggle the opt-out flag mid-event. Preserves the signup + match
+// history; just excludes the player from future matchmaking pool reads.
+export function useSetOptOut(eventId: string) {
+  const qc = useQueryClient();
+  return useApiMutation<SignupResponse, Error, boolean>({
+    mutationFn: (optedOut) =>
+      apiFetch<SignupResponse>(`/api/events/${eventId}/opt-out`, {
+        method: "PATCH",
+        body: { optedOut },
+      }),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: eventKey(eventId) });
+    },
+  });
+}
+
 // Admin: PATCH a specific signup to CONFIRMED or DECLINED. We keep status in
 // the variables so call sites can distinguish which button is mid-flight via
 // `mutation.variables`.
